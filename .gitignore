@@ -145,3 +145,7 @@ backend/main
 
 # Local development
 .local/
+
+# Uploaded files
+backend/uploads/
+uploads/

@@ -96,3 +96,59 @@ export interface ErrorResponse {
   message: string
   error?: string
 }
+
+export interface Dish {
+  id: number
+  name: string
+  description: string
+  tags: string
+  isActive: boolean
+  isSeasonal: boolean
+  availableMonths: string
+  seasonalNote: string
+  imageUrl: string
+  thumbnailUrl: string
+  galleryUrls: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateDishRequest {
+  name: string
+  description?: string
+  tags?: string
+  isActive?: boolean
+  isSeasonal?: boolean
+  availableMonths?: string
+  seasonalNote?: string
+  imageUrl?: string
+  thumbnailUrl?: string
+  galleryUrls?: string
+}
+
+export interface UpdateDishRequest {
+  name?: string
+  description?: string
+  tags?: string
+  isActive?: boolean
+  isSeasonal?: boolean
+  availableMonths?: string
+  seasonalNote?: string
+  imageUrl?: string
+  thumbnailUrl?: string
+  galleryUrls?: string
+}
+
+export interface MediaFile {
+  url: string
+  thumbnailUrl?: string
+  fileName: string
+  contentType: string
+  size: number
+}
+
+export interface UploadURLResponse {
+  uploadUrl: string
+  fileUrl: string
+  key: string
+}
