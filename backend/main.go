@@ -40,8 +40,13 @@ func main() {
     // Initialize API with database
     api.InitDatabase(db)
 
+    // Initialize storage service
+    if err := api.InitStorageService(); err != nil {
+        log.Fatal("Failed to initialize storage service:", err)
+    }
+
     // Auto-migrate the schema
-    err = db.AutoMigrate(&models.User{}, &models.Content{}, &models.Category{}, &models.Recommendation{}, &models.Dish{})
+    err = db.AutoMigrate(&models.User{}, &models.Content{}, &models.Category{}, &models.Recommendation{}, &models.Dish{}, &models.Media{})
     if err != nil {
         log.Fatal("Failed to migrate database:", err)
     }
