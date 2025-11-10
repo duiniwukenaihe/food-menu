@@ -5,13 +5,9 @@ import (
     "os"
 
     "github.com/gin-gonic/gin"
-    swaggerFiles "github.com/swaggo/files"
-    ginSwagger "github.com/swaggo/gin-swagger"
     "example.com/app/internal/api"
     "example.com/app/internal/database"
     "example.com/app/internal/models"
-
-    _ "example.com/app/docs"
 )
 
 // @title Full-Stack App API
@@ -128,9 +124,6 @@ func main() {
         }
     }
 
-    // Swagger documentation
-    r.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
     // Health check
     r.GET("/health", func(c *gin.Context) {
         c.JSON(200, gin.H{"status": "ok"})
@@ -142,7 +135,6 @@ func main() {
     }
 
     log.Printf("Server starting on port %s", port)
-    log.Printf("Swagger documentation available at http://localhost:%s/docs/index.html", port)
     
     if err := r.Run(":" + port); err != nil {
         log.Fatal("Failed to start server:", err)

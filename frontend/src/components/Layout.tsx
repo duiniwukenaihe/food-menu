@@ -2,13 +2,39 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { User, LogOut, Menu, X } from 'lucide-react'
 import { useState } from 'react'
+import LoginModal from './LoginModal'
+import RegisterModal from './RegisterModal'
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout } = useAuth()
   const location = useLocation()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
 
   const isActive = (path: string) => location.pathname === path
+
+  const openLoginModal = () => {
+    setIsLoginModalOpen(true)
+    setIsRegisterModalOpen(false)
+  }
+
+  const openRegisterModal = () => {
+    setIsRegisterModalOpen(true)
+    setIsLoginModalOpen(false)
+  }
+
+  const closeModals = () => {
+    setIsLoginModalOpen(false)
+    setIsRegisterModalOpen(false)
+  }
+
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Good morning'
+    if (hour < 17) return 'Good afternoon'
+    return 'Good evening'
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -75,7 +101,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               {user ? (
                 <div className="flex items-center space-x-4">
                   <span className="text-sm text-gray-700">
-                    Welcome, {user.firstName}
+                    {getGreeting()}, {user.firstName}! 👋
                   </span>
                   <button
                     onClick={logout}
@@ -86,18 +112,18 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 </div>
               ) : (
                 <div className="flex items-center space-x-4">
-                  <Link
-                    to="/login"
+                  <button
+                    onClick={openLoginModal}
                     className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
                   >
                     Login
-                  </Link>
-                  <Link
-                    to="/register"
+                  </button>
+                  <button
+                    onClick={openRegisterModal}
                     className="bg-indigo-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-700"
                   >
                     Register
-                  </Link>
+                  </button>
                 </div>
               )}
             </div>
@@ -160,7 +186,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     </div>
                     <div className="ml-3">
                       <div className="text-base font-medium text-gray-800">
-                        {user.firstName} {user.lastName}
+                        {getGreeting()}, {user.firstName}!
                       </div>
                       <div className="text-sm font-medium text-gray-500">
                         {user.email}
@@ -178,24 +204,36 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 </div>
               ) : (
                 <div className="space-y-1">
-                  <Link
-                    to="/login"
-                    className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                  <button
+                    onClick={openLoginModal}
+                    className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 w-full text-left"
                   >
                     Login
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                  </button>
+                  <button
+                    onClick={openRegisterModal}
+                    className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 w-full text-left"
                   >
                     Register
-                  </Link>
+                  </button>
                 </div>
               )}
             </div>
           </div>
         )}
       </nav>
+
+      {/* Login/Register Modals */}
+      <LoginModal 
+        isOpen={isLoginModalOpen} 
+        onClose={closeModals} 
+        onSwitchToRegister={openRegisterModal}
+      />
+      <RegisterModal 
+        isOpen={isRegisterModalOpen} 
+        onClose={closeModals} 
+        onSwitchToLogin={openLoginModal}
+      />
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">

@@ -4,7 +4,7 @@ import Layout from './components/Layout'
 import AdminRoute from './components/AdminRoute'
 import Login from './pages/Login'
 import Register from './pages/Register'
-import Dashboard from './pages/Dashboard'
+import Home from './pages/Home'
 import ContentList from './pages/ContentList'
 import ContentDetail from './pages/ContentDetail'
 import Profile from './pages/Profile'
@@ -24,7 +24,7 @@ function App() {
   return (
     <Layout>
       <Routes>
-        <Route path="/" element={<ContentList />} />
+        <Route path="/" element={<Home />} />
         <Route path="/content" element={<ContentList />} />
         <Route path="/content/:id" element={<ContentDetail />} />
         
@@ -35,7 +35,6 @@ function App() {
           </>
         ) : (
           <>
-            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/profile" element={<Profile />} />
             <Route
               path="/admin/*"

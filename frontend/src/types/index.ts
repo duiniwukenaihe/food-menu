@@ -51,8 +51,13 @@ export interface Content {
   author: User
   tags?: string
   imageUrl?: string
+  videoUrl?: string
   isPublished: boolean
   viewCount: number
+  difficulty?: string
+  prepTime?: string
+  servings?: string
+  rating?: number
   createdAt: string
   updatedAt: string
 }
