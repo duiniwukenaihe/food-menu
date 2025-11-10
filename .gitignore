@@ -149,3 +149,7 @@ backend/main
 # Uploaded files
 backend/uploads/
 uploads/
+backend/test_uploads/
+backend/test_uploads_local/
+backend/test_uploads_video/
+test_uploads/

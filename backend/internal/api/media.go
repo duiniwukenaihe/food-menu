@@ -1,20 +1,21 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"example.com/app/internal/models"
+	"example.com/app/internal/services"
 )
 
 const (
 	MaxFileSize   = 10 * 1024 * 1024 // 10MB
+	MaxVideoSize  = 100 * 1024 * 1024 // 100MB
 	UploadDir     = "./uploads"
 )
 
@@ -24,6 +25,20 @@ var allowedImageTypes = map[string]bool{
 	"image/png":  true,
 	"image/gif":  true,
 	"image/webp": true,
+}
+
+var allowedVideoTypes = map[string]bool{
+	"video/mp4":  true,
+	"video/webm": true,
+	"video/ogg":  true,
+}
+
+var storageService services.StorageService
+
+func InitStorageService() error {
+	var err error
+	storageService, err = services.NewStorageService()
+	return err
 }
 
 // GetUploadURL godoc
@@ -50,27 +65,33 @@ func GetUploadURL(c *gin.Context) {
 	}
 
 	// Validate content type
-	if !allowedImageTypes[req.ContentType] {
+	if !allowedImageTypes[req.ContentType] && !allowedVideoTypes[req.ContentType] {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Success: false,
-			Message: "Invalid content type. Only images are allowed",
+			Message: "Invalid content type. Only images and videos are allowed",
 		})
 		return
 	}
 
-	// Generate unique key for the file
-	ext := filepath.Ext(req.FileName)
-	key := fmt.Sprintf("dishes/%s/%s%s", time.Now().Format("2006/01"), uuid.New().String(), ext)
-
-	// In a production environment, you would generate a presigned URL for S3/MinIO
-	// For now, we'll return a local upload endpoint
-	baseURL := os.Getenv("API_BASE_URL")
-	if baseURL == "" {
-		baseURL = "http://localhost:8080"
+	// Validate file name length
+	if len(req.FileName) == 0 || len(req.FileName) > 255 {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Success: false,
+			Message: "File name must be between 1 and 255 characters",
+		})
+		return
 	}
 
-	uploadURL := fmt.Sprintf("%s/api/v1/admin/media/upload?key=%s", baseURL, key)
-	fileURL := fmt.Sprintf("%s/api/v1/media/%s", baseURL, key)
+	ctx := context.Background()
+	uploadURL, fileURL, key, err := storageService.GeneratePresignedUploadURL(ctx, req.FileName, req.ContentType)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Success: false,
+			Message: "Failed to generate upload URL",
+			Error:   err.Error(),
+		})
+		return
+	}
 
 	c.JSON(http.StatusOK, models.SuccessResponse{
 		Success: true,
@@ -107,21 +128,28 @@ func UploadFile(c *gin.Context) {
 		return
 	}
 
+	contentType := file.Header.Get("Content-Type")
+	
+	// Determine max file size based on content type
+	maxSize := MaxFileSize
+	if allowedVideoTypes[contentType] {
+		maxSize = MaxVideoSize
+	}
+
 	// Validate file size
-	if file.Size > MaxFileSize {
+	if file.Size > int64(maxSize) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Success: false,
-			Message: fmt.Sprintf("File size exceeds maximum allowed size of %dMB", MaxFileSize/(1024*1024)),
+			Message: fmt.Sprintf("File size exceeds maximum allowed size of %dMB", maxSize/(1024*1024)),
 		})
 		return
 	}
 
 	// Validate content type
-	contentType := file.Header.Get("Content-Type")
-	if !allowedImageTypes[contentType] {
+	if !allowedImageTypes[contentType] && !allowedVideoTypes[contentType] {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Success: false,
-			Message: "Invalid file type. Only images are allowed",
+			Message: "Invalid file type. Only images and videos are allowed",
 		})
 		return
 	}
@@ -130,37 +158,66 @@ func UploadFile(c *gin.Context) {
 	key := c.Query("key")
 	if key == "" {
 		ext := filepath.Ext(file.Filename)
-		key = fmt.Sprintf("dishes/%s/%s%s", time.Now().Format("2006/01"), uuid.New().String(), ext)
+		ctx := context.Background()
+		_, _, key, err = storageService.GeneratePresignedUploadURL(ctx, file.Filename, contentType)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+				Success: false,
+				Message: "Failed to generate file key",
+				Error:   err.Error(),
+			})
+			return
+		}
+		// Extract just the key from the generated URL
+		if strings.Contains(key, "?key=") {
+			parts := strings.Split(key, "?key=")
+			if len(parts) > 1 {
+				key = parts[1]
+			}
+		}
+		// If key doesn't have extension, use filename extension
+		if filepath.Ext(key) == "" && ext != "" {
+			key = key + ext
+		}
 	}
 
-	// Ensure upload directory exists
-	uploadPath := filepath.Join(UploadDir, filepath.Dir(key))
-	if err := os.MkdirAll(uploadPath, 0755); err != nil {
+	// Open the uploaded file
+	fileReader, err := file.Open()
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Success: false,
-			Message: "Failed to create upload directory",
+			Message: "Failed to open file",
+			Error:   err.Error(),
+		})
+		return
+	}
+	defer fileReader.Close()
+
+	// Upload file using storage service
+	ctx := context.Background()
+	fileURL, err := storageService.UploadFile(ctx, fileReader, key, contentType, file.Size)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Success: false,
+			Message: "Failed to upload file",
 			Error:   err.Error(),
 		})
 		return
 	}
 
-	// Save the file
-	filePath := filepath.Join(UploadDir, key)
-	if err := c.SaveUploadedFile(file, filePath); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Success: false,
-			Message: "Failed to save file",
-			Error:   err.Error(),
-		})
-		return
+	// Save media metadata to database
+	media := models.Media{
+		Key:         key,
+		URL:         fileURL,
+		FileName:    file.Filename,
+		ContentType: contentType,
+		Size:        file.Size,
 	}
 
-	// Generate file URL
-	baseURL := os.Getenv("API_BASE_URL")
-	if baseURL == "" {
-		baseURL = "http://localhost:8080"
+	if err := db.Create(&media).Error; err != nil {
+		// Log error but don't fail the request since file is already uploaded
+		fmt.Printf("Warning: Failed to save media metadata: %v\n", err)
 	}
-	fileURL := fmt.Sprintf("%s/api/v1/media/%s", baseURL, key)
 
 	c.JSON(http.StatusOK, models.SuccessResponse{
 		Success: true,
@@ -178,7 +235,7 @@ func UploadFile(c *gin.Context) {
 // @Summary Get uploaded media file
 // @Description Serve uploaded media files
 // @Tags media
-// @Produce image/jpeg,image/png,image/gif,image/webp
+// @Produce image/jpeg,image/png,image/gif,image/webp,video/mp4
 // @Param filepath path string true "File path"
 // @Success 200 {file} binary
 // @Failure 404 {object} models.ErrorResponse
@@ -213,18 +270,28 @@ func GetMedia(c *gin.Context) {
 
 // DeleteMedia godoc
 // @Summary Delete uploaded media file
-// @Description Delete an uploaded media file (admin only)
+// @Description Delete an uploaded media file and clean up database record (admin only)
 // @Tags media
 // @Security BearerAuth
 // @Accept json
 // @Produce json
-// @Param key query string true "File key/path"
+// @Param request body models.DeleteMediaRequest true "Delete media request"
 // @Success 200 {object} models.SuccessResponse
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 500 {object} models.ErrorResponse
 // @Router /admin/media [delete]
 func DeleteMedia(c *gin.Context) {
-	key := c.Query("key")
+	var req models.DeleteMediaRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Success: false,
+			Message: "Invalid request body",
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	key := req.Key
 	if key == "" {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Success: false,
@@ -242,19 +309,9 @@ func DeleteMedia(c *gin.Context) {
 		return
 	}
 
-	fullPath := filepath.Join(UploadDir, key)
-
-	// Check if file exists
-	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-		c.JSON(http.StatusNotFound, models.ErrorResponse{
-			Success: false,
-			Message: "File not found",
-		})
-		return
-	}
-
-	// Delete the file
-	if err := os.Remove(fullPath); err != nil {
+	// Delete from storage
+	ctx := context.Background()
+	if err := storageService.DeleteFile(ctx, key); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Success: false,
 			Message: "Failed to delete file",
@@ -263,8 +320,60 @@ func DeleteMedia(c *gin.Context) {
 		return
 	}
 
+	// Delete from database
+	var media models.Media
+	if err := db.Where("key = ?", key).First(&media).Error; err == nil {
+		db.Delete(&media)
+	}
+
 	c.JSON(http.StatusOK, models.SuccessResponse{
 		Success: true,
 		Message: "File deleted successfully",
 	})
+}
+
+// CleanupReplacedMedia deletes old media when it's replaced
+func CleanupReplacedMedia(oldURL string) error {
+	if oldURL == "" {
+		return nil
+	}
+
+	// Extract key from URL
+	// URL format: http://host/api/v1/media/{key} or http://host/{bucket}/{key}
+	parts := strings.Split(oldURL, "/")
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid URL format")
+	}
+
+	var key string
+	// Check if it's a media API URL
+	for i, part := range parts {
+		if part == "media" && i+1 < len(parts) {
+			key = strings.Join(parts[i+1:], "/")
+			break
+		}
+	}
+
+	// If not found, try to extract from bucket URL
+	if key == "" && len(parts) >= 2 {
+		// Assume last parts are bucket/key
+		key = parts[len(parts)-1]
+	}
+
+	if key == "" {
+		return fmt.Errorf("could not extract key from URL")
+	}
+
+	ctx := context.Background()
+	if err := storageService.DeleteFile(ctx, key); err != nil {
+		return fmt.Errorf("failed to delete old media: %w", err)
+	}
+
+	// Delete from database
+	var media models.Media
+	if err := db.Where("key = ?", key).First(&media).Error; err == nil {
+		db.Delete(&media)
+	}
+
+	return nil
 }
