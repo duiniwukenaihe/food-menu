@@ -27,8 +27,8 @@ Cypress.Commands.add('dismiss', { prevSubject: 'optional'}, (subject, options) =
 declare global {
   namespace Cypress {
     interface Chainable {
-      login(username: string, password: string): Chainable<Element>
-      register(userData: any): Chainable<Element>
+      login(username: string, password: string): Chainable<void>
+      register(userData: Record<string, unknown>): Chainable<void>
     }
   }
 }

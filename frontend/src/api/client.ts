@@ -1,232 +1,68 @@
-import axios, { AxiosResponse } from 'axios'
-import toast from 'react-hot-toast'
-import { AuthResponse, ErrorResponse } from '../types'
+import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'
+const baseURL = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
-export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+export const apiClient: AxiosInstance = axios.create({
+  baseURL,
+  withCredentials: true,
+  timeout: 15000,
 })
 
-// Request interceptor to add auth token
-apiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
-  }
-)
+export type AuthBridge = {
+  getAccessToken: () => string | null
+  handleUnauthorized: () => void
+}
 
-// Response interceptor to handle errors
+let authBridge: AuthBridge | null = null
+
+export const configureApiClient = (bridge: AuthBridge) => {
+  authBridge = bridge
+}
+
+apiClient.interceptors.request.use(config => {
+  const token = authBridge?.getAccessToken()
+  if (token) {
+    config.headers = {
+      ...(config.headers ?? {}),
+      Authorization: `Bearer ${token}`,
+    }
+  }
+  return config
+})
+
 apiClient.interceptors.response.use(
-  (response: AxiosResponse) => {
-    return response
-  },
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
-      toast.error('Session expired. Please login again.')
-    } else if (error.response?.data?.message) {
-      toast.error(error.response.data.message)
-    } else {
-      toast.error('An error occurred. Please try again.')
+  response => response,
+  error => {
+    const status = error.response?.status
+    if (status === 401) {
+      authBridge?.handleUnauthorized()
     }
     return Promise.reject(error)
   }
 )
 
-export const authApi = {
-  login: async (credentials: { username: string; password: string }): Promise<AuthResponse> => {
-    const response = await apiClient.post('/auth/login', credentials)
-    return response.data
-  },
-
-  register: async (userData: {
-    username: string
-    email: string
-    password: string
-    firstName: string
-    lastName: string
-  }): Promise<AuthResponse> => {
-    const response = await apiClient.post('/auth/register', userData)
-    return response.data
-  },
-
-  getProfile: async (): Promise<{ success: boolean; data: any }> => {
-    const response = await apiClient.get('/auth/profile')
-    return response.data
-  },
-
-  updateProfile: async (userData: {
-    firstName?: string
-    lastName?: string
-    avatar?: string
-  }): Promise<{ success: boolean; data: any }> => {
-    const response = await apiClient.put('/auth/profile', userData)
-    return response.data
-  },
-}
-
-export const contentApi = {
-  getContent: async (params?: {
-    page?: number
-    limit?: number
-    category?: number
-    search?: string
-  }): Promise<any> => {
-    const response = await apiClient.get('/content', { params })
-    return response.data
-  },
-
-  getContentById: async (id: number): Promise<any> => {
-    const response = await apiClient.get(`/content/${id}`)
-    return response.data
-  },
-
-  getCategories: async (): Promise<any> => {
-    const response = await apiClient.get('/categories')
-    return response.data
-  },
-
-  getRecommendations: async (limit?: number): Promise<any> => {
-    const response = await apiClient.get('/recommendations', { params: { limit } })
-    return response.data
-  },
-}
-
-export const adminApi = {
-  // Users
-  getUsers: async (params?: { page?: number; limit?: number }): Promise<any> => {
-    const response = await apiClient.get('/admin/users', { params })
-    return response.data
-  },
-
-  createUser: async (userData: any): Promise<any> => {
-    const response = await apiClient.post('/admin/users', userData)
-    return response.data
-  },
-
-  updateUser: async (id: number, userData: any): Promise<any> => {
-    const response = await apiClient.put(`/admin/users/${id}`, userData)
-    return response.data
-  },
-
-  deleteUser: async (id: number): Promise<any> => {
-    const response = await apiClient.delete(`/admin/users/${id}`)
-    return response.data
-  },
-
-  // Content
-  getAdminContent: async (params?: { page?: number; limit?: number }): Promise<any> => {
-    const response = await apiClient.get('/admin/content', { params })
-    return response.data
-  },
-
-  createContent: async (contentData: any): Promise<any> => {
-    const response = await apiClient.post('/admin/content', contentData)
-    return response.data
-  },
-
-  updateContent: async (id: number, contentData: any): Promise<any> => {
-    const response = await apiClient.put(`/admin/content/${id}`, contentData)
-    return response.data
-  },
-
-  deleteContent: async (id: number): Promise<any> => {
-    const response = await apiClient.delete(`/admin/content/${id}`)
-    return response.data
-  },
-
-  // Categories
-  getAdminCategories: async (): Promise<any> => {
-    const response = await apiClient.get('/admin/categories')
-    return response.data
-  },
-
-  createCategory: async (categoryData: any): Promise<any> => {
-    const response = await apiClient.post('/admin/categories', categoryData)
-    return response.data
-  },
-
-  updateCategory: async (id: number, categoryData: any): Promise<any> => {
-    const response = await apiClient.put(`/admin/categories/${id}`, categoryData)
-    return response.data
-  },
-
-  deleteCategory: async (id: number): Promise<any> => {
-    const response = await apiClient.delete(`/admin/categories/${id}`)
-    return response.data
-  },
-
-  // Dishes
-  getDishes: async (params?: {
-    page?: number
-    limit?: number
-    search?: string
-    isSeasonal?: boolean
-    isActive?: boolean
-    tags?: string
-  }): Promise<any> => {
-    const response = await apiClient.get('/admin/dishes', { params })
-    return response.data
-  },
-
-  getDishById: async (id: number): Promise<any> => {
-    const response = await apiClient.get(`/admin/dishes/${id}`)
-    return response.data
-  },
-
-  createDish: async (dishData: any): Promise<any> => {
-    const response = await apiClient.post('/admin/dishes', dishData)
-    return response.data
-  },
-
-  updateDish: async (id: number, dishData: any): Promise<any> => {
-    const response = await apiClient.put(`/admin/dishes/${id}`, dishData)
-    return response.data
-  },
-
-  deleteDish: async (id: number): Promise<any> => {
-    const response = await apiClient.delete(`/admin/dishes/${id}`)
-    return response.data
-  },
-
-  // Media
-  getUploadUrl: async (fileName: string, contentType: string): Promise<any> => {
-    const response = await apiClient.post('/admin/media/upload-url', { fileName, contentType })
-    return response.data
-  },
-
-  uploadFile: async (file: File, onProgress?: (progress: number) => void): Promise<any> => {
-    const formData = new FormData()
-    formData.append('file', file)
-
-    const response = await apiClient.post('/admin/media/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      onUploadProgress: (progressEvent) => {
-        if (onProgress && progressEvent.total) {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-          onProgress(percentCompleted)
+export const createApiClient = (config?: AxiosRequestConfig) => {
+  const instance = axios.create({ baseURL, timeout: 15000, ...config })
+  if (authBridge) {
+    instance.interceptors.request.use(requestConfig => {
+      const token = authBridge?.getAccessToken()
+      if (token) {
+        requestConfig.headers = {
+          ...(requestConfig.headers ?? {}),
+          Authorization: `Bearer ${token}`,
         }
-      },
+      }
+      return requestConfig
     })
-    return response.data
-  },
-
-  deleteMedia: async (key: string): Promise<any> => {
-    const response = await apiClient.delete('/admin/media', { params: { key } })
-    return response.data
-  },
+    instance.interceptors.response.use(
+      response => response,
+      error => {
+        if (error.response?.status === 401) {
+          authBridge?.handleUnauthorized()
+        }
+        return Promise.reject(error)
+      }
+    )
+  }
+  return instance
 }
