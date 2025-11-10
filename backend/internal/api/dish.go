@@ -11,7 +11,7 @@ import (
 
 // GetDishes godoc
 // @Summary Get all dishes (public)
-// @Description Get a paginated list of dishes with optional filters
+// @Description Get a paginated list of dishes with optional filters including category
 // @Tags dishes
 // @Accept json
 // @Produce json
@@ -21,6 +21,7 @@ import (
 // @Param isSeasonal query bool false "Filter by seasonal dishes"
 // @Param isActive query bool false "Filter by active status"
 // @Param tags query string false "Filter by tags (comma-separated)"
+// @Param categoryId query int false "Filter by category ID"
 // @Success 200 {object} models.PaginatedResponse
 // @Failure 500 {object} models.ErrorResponse
 // @Router /dishes [get]
@@ -56,6 +57,10 @@ func GetDishes(c *gin.Context) {
         query = query.Where("is_active = ?", true)
     }
 
+    if params.CategoryID > 0 {
+        query = query.Where("category_id = ?", params.CategoryID)
+    }
+
     if params.Tags != "" {
         tags := strings.Split(params.Tags, ",")
         for _, tag := range tags {
@@ -75,7 +80,7 @@ func GetDishes(c *gin.Context) {
     }
 
     offset := params.GetOffset()
-    if err := query.Offset(offset).Limit(params.Limit).Order("created_at DESC").Find(&dishes).Error; err != nil {
+    if err := query.Preload("Category").Offset(offset).Limit(params.Limit).Order("created_at DESC").Find(&dishes).Error; err != nil {
         c.JSON(http.StatusInternalServerError, models.ErrorResponse{
             Success: false,
             Message: "Failed to fetch dishes",
@@ -95,7 +100,7 @@ func GetDishes(c *gin.Context) {
 
 // GetDishByID godoc
 // @Summary Get dish by ID
-// @Description Get a single dish by its ID
+// @Description Get a single dish by its ID with all details including steps and media
 // @Tags dishes
 // @Accept json
 // @Produce json
@@ -107,7 +112,7 @@ func GetDishByID(c *gin.Context) {
     id := c.Param("id")
 
     var dish models.Dish
-    if err := db.Where("id = ? AND is_active = ?", id, true).First(&dish).Error; err != nil {
+    if err := db.Preload("Category").Where("id = ? AND is_active = ?", id, true).First(&dish).Error; err != nil {
         c.JSON(http.StatusNotFound, models.ErrorResponse{
             Success: false,
             Message: "Dish not found",
@@ -134,6 +139,7 @@ func GetDishByID(c *gin.Context) {
 // @Param isSeasonal query bool false "Filter by seasonal dishes"
 // @Param isActive query bool false "Filter by active status"
 // @Param tags query string false "Filter by tags (comma-separated)"
+// @Param categoryId query int false "Filter by category ID"
 // @Success 200 {object} models.PaginatedResponse
 // @Failure 500 {object} models.ErrorResponse
 // @Router /admin/dishes [get]
@@ -166,6 +172,10 @@ func AdminGetDishes(c *gin.Context) {
         query = query.Where("is_active = ?", *params.IsActive)
     }
 
+    if params.CategoryID > 0 {
+        query = query.Where("category_id = ?", params.CategoryID)
+    }
+
     if params.Tags != "" {
         tags := strings.Split(params.Tags, ",")
         for _, tag := range tags {
@@ -185,7 +195,7 @@ func AdminGetDishes(c *gin.Context) {
     }
 
     offset := params.GetOffset()
-    if err := query.Offset(offset).Limit(params.Limit).Order("created_at DESC").Find(&dishes).Error; err != nil {
+    if err := query.Preload("Category").Offset(offset).Limit(params.Limit).Order("created_at DESC").Find(&dishes).Error; err != nil {
         c.JSON(http.StatusInternalServerError, models.ErrorResponse{
             Success: false,
             Message: "Failed to fetch dishes",
@@ -231,6 +241,8 @@ func CreateDish(c *gin.Context) {
         Description:     req.Description,
         Tags:            req.Tags,
         IsActive:        req.IsActive,
+        CategoryID:      req.CategoryID,
+        TextSteps:       req.TextSteps,
         IsSeasonal:      req.IsSeasonal,
         AvailableMonths: req.AvailableMonths,
         SeasonalNote:    req.SeasonalNote,
@@ -317,6 +329,12 @@ func UpdateDish(c *gin.Context) {
     }
     if req.IsActive != nil {
         updates["is_active"] = *req.IsActive
+    }
+    if req.CategoryID != nil {
+        updates["category_id"] = *req.CategoryID
+    }
+    if req.TextSteps != nil {
+        updates["text_steps"] = *req.TextSteps
     }
     if req.IsSeasonal != nil {
         updates["is_seasonal"] = *req.IsSeasonal

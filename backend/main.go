@@ -45,8 +45,11 @@ func main() {
         log.Fatal("Failed to initialize storage service:", err)
     }
 
+    // Initialize menu service
+    api.InitMenuService()
+
     // Auto-migrate the schema
-    err = db.AutoMigrate(&models.User{}, &models.Content{}, &models.Category{}, &models.Recommendation{}, &models.Dish{}, &models.Media{})
+    err = db.AutoMigrate(&models.User{}, &models.Content{}, &models.Category{}, &models.Recommendation{}, &models.Dish{}, &models.Media{}, &models.MenuConfig{})
     if err != nil {
         log.Fatal("Failed to migrate database:", err)
     }
@@ -86,6 +89,11 @@ func main() {
         v1.GET("/dishes", api.GetDishes)
         v1.GET("/dishes/:id", api.GetDishByID)
         
+        // Menu endpoints
+        v1.GET("/menu/seasonal", api.GetSeasonalMenu)
+        v1.GET("/menu/suggested", api.GetSuggestedMenu)
+        v1.GET("/menu/config", api.GetMenuConfig)
+        
         // Media serving (public)
         v1.GET("/media/*filepath", api.GetMedia)
 
@@ -120,6 +128,9 @@ func main() {
                 admin.POST("/dishes", api.CreateDish)
                 admin.PUT("/dishes/:id", api.UpdateDish)
                 admin.DELETE("/dishes/:id", api.DeleteDish)
+                
+                // Menu configuration
+                admin.PUT("/menu/config", api.UpdateMenuConfigHandler)
                 
                 // Media upload
                 admin.POST("/media/upload-url", api.GetUploadURL)
