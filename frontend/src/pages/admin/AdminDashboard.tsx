@@ -1,5 +1,6 @@
 import { Routes, Route, Link, useLocation } from 'react-router-dom'
-import { Users, FileText, Tags, Settings, BarChart3 } from 'lucide-react'
+import { Users, FileText, Tags, Settings, BarChart3, UtensilsCrossed } from 'lucide-react'
+import DishManagement from './DishManagement'
 
 const AdminDashboard = () => {
   const location = useLocation()
@@ -7,6 +8,7 @@ const AdminDashboard = () => {
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: BarChart3 },
     { name: 'Users', href: '/admin/users', icon: Users },
+    { name: 'Dishes', href: '/admin/dishes', icon: UtensilsCrossed },
     { name: 'Content', href: '/admin/content', icon: FileText },
     { name: 'Categories', href: '/admin/categories', icon: Tags },
     { name: 'Settings', href: '/admin/settings', icon: Settings },
@@ -53,6 +55,7 @@ const AdminDashboard = () => {
             <Routes>
               <Route path="/" element={<AdminHome />} />
               <Route path="/users" element={<UserManagement />} />
+              <Route path="/dishes" element={<DishManagement />} />
               <Route path="/content" element={<ContentManagement />} />
               <Route path="/categories" element={<CategoryManagement />} />
               <Route path="/settings" element={<SettingsPage />} />

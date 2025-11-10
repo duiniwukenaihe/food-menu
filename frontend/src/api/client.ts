@@ -167,4 +167,66 @@ export const adminApi = {
     const response = await apiClient.delete(`/admin/categories/${id}`)
     return response.data
   },
+
+  // Dishes
+  getDishes: async (params?: {
+    page?: number
+    limit?: number
+    search?: string
+    isSeasonal?: boolean
+    isActive?: boolean
+    tags?: string
+  }): Promise<any> => {
+    const response = await apiClient.get('/admin/dishes', { params })
+    return response.data
+  },
+
+  getDishById: async (id: number): Promise<any> => {
+    const response = await apiClient.get(`/admin/dishes/${id}`)
+    return response.data
+  },
+
+  createDish: async (dishData: any): Promise<any> => {
+    const response = await apiClient.post('/admin/dishes', dishData)
+    return response.data
+  },
+
+  updateDish: async (id: number, dishData: any): Promise<any> => {
+    const response = await apiClient.put(`/admin/dishes/${id}`, dishData)
+    return response.data
+  },
+
+  deleteDish: async (id: number): Promise<any> => {
+    const response = await apiClient.delete(`/admin/dishes/${id}`)
+    return response.data
+  },
+
+  // Media
+  getUploadUrl: async (fileName: string, contentType: string): Promise<any> => {
+    const response = await apiClient.post('/admin/media/upload-url', { fileName, contentType })
+    return response.data
+  },
+
+  uploadFile: async (file: File, onProgress?: (progress: number) => void): Promise<any> => {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await apiClient.post('/admin/media/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          onProgress(percentCompleted)
+        }
+      },
+    })
+    return response.data
+  },
+
+  deleteMedia: async (key: string): Promise<any> => {
+    const response = await apiClient.delete('/admin/media', { params: { key } })
+    return response.data
+  },
 }

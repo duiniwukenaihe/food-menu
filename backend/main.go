@@ -45,7 +45,7 @@ func main() {
     api.InitDatabase(db)
 
     // Auto-migrate the schema
-    err = db.AutoMigrate(&models.User{}, &models.Content{}, &models.Category{}, &models.Recommendation{})
+    err = db.AutoMigrate(&models.User{}, &models.Content{}, &models.Category{}, &models.Recommendation{}, &models.Dish{})
     if err != nil {
         log.Fatal("Failed to migrate database:", err)
     }
@@ -82,6 +82,11 @@ func main() {
         v1.GET("/content/:id", api.GetContentByID)
         v1.GET("/categories", api.GetCategories)
         v1.GET("/recommendations", api.GetRecommendations)
+        v1.GET("/dishes", api.GetDishes)
+        v1.GET("/dishes/:id", api.GetDishByID)
+        
+        // Media serving (public)
+        v1.GET("/media/*filepath", api.GetMedia)
 
         // Protected routes
         protected := v1.Group("/")
@@ -108,6 +113,17 @@ func main() {
                 admin.POST("/categories", api.CreateCategory)
                 admin.PUT("/categories/:id", api.UpdateCategory)
                 admin.DELETE("/categories/:id", api.DeleteCategory)
+                
+                // Dish management
+                admin.GET("/dishes", api.AdminGetDishes)
+                admin.POST("/dishes", api.CreateDish)
+                admin.PUT("/dishes/:id", api.UpdateDish)
+                admin.DELETE("/dishes/:id", api.DeleteDish)
+                
+                // Media upload
+                admin.POST("/media/upload-url", api.GetUploadURL)
+                admin.POST("/media/upload", api.UploadFile)
+                admin.DELETE("/media", api.DeleteMedia)
             }
         }
     }
