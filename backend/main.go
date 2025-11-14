@@ -59,6 +59,11 @@ func main() {
     // Initialize router
     r := gin.Default()
 
+    // Security and validation middleware
+    r.Use(api.SanitizeInput())
+    r.Use(api.SecurityHeaders())
+    r.Use(api.ValidationMiddleware())
+
     // CORS middleware
     r.Use(func(c *gin.Context) {
         c.Header("Access-Control-Allow-Origin", "*")
@@ -79,6 +84,7 @@ func main() {
         // Public routes
         v1.POST("/auth/register", api.Register)
         v1.POST("/auth/login", api.Login)
+        v1.POST("/auth/logout", api.Logout)
         v1.GET("/content", api.GetContent)
         v1.GET("/content/:id", api.GetContentByID)
         v1.GET("/categories", api.GetCategories)
