@@ -7,6 +7,7 @@ import (
 
     "github.com/gin-gonic/gin"
     "example.com/app/internal/models"
+    "example.com/app/internal/repository"
 )
 
 // GetDishes godoc
@@ -35,38 +36,16 @@ func GetDishes(c *gin.Context) {
         return
     }
 
-    var dishes []models.Dish
-    var total int64
-
-    query := db.Model(&models.Dish{})
-
-    // Apply filters
-    if params.Search != "" {
-        query = query.Where("name ILIKE ? OR description ILIKE ?", "%"+params.Search+"%", "%"+params.Search+"%")
+    repo := dishRepository(c.Request.Context())
+    if repo == nil {
+        c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+            Success: false,
+            Message: "Repository not initialized",
+        })
+        return
     }
 
-    if params.IsSeasonal != nil {
-        query = query.Where("is_seasonal = ?", *params.IsSeasonal)
-    }
-
-    if params.IsActive != nil {
-        query = query.Where("is_active = ?", *params.IsActive)
-    } else {
-        // By default, only show active dishes for public endpoint
-        query = query.Where("is_active = ?", true)
-    }
-
-    if params.Tags != "" {
-        tags := strings.Split(params.Tags, ",")
-        for _, tag := range tags {
-            query = query.Where("tags ILIKE ?", "%"+strings.TrimSpace(tag)+"%")
-        }
-    }
-
-    // Get total count
-    query.Count(&total)
-
-    // Apply pagination
+    // Apply defaults
     if params.Limit <= 0 {
         params.Limit = 10
     }
@@ -74,8 +53,29 @@ func GetDishes(c *gin.Context) {
         params.Page = 1
     }
 
+    filter := repository.DishFilter{
+        Search: strings.TrimSpace(params.Search),
+    }
+
+    if params.IsSeasonal != nil {
+        filter.IsSeasonal = params.IsSeasonal
+    }
+
+    if params.IsActive != nil {
+        filter.IsActive = params.IsActive
+    } else {
+        active := true
+        filter.IsActive = &active
+    }
+
+    if params.Tags != "" {
+        tags := strings.Split(params.Tags, ",")
+        filter.Tags = tags
+    }
+
     offset := params.GetOffset()
-    if err := query.Offset(offset).Limit(params.Limit).Order("created_at DESC").Find(&dishes).Error; err != nil {
+    dishes, total, err := repo.List(filter, offset, params.Limit)
+    if err != nil {
         c.JSON(http.StatusInternalServerError, models.ErrorResponse{
             Success: false,
             Message: "Failed to fetch dishes",
@@ -104,10 +104,26 @@ func GetDishes(c *gin.Context) {
 // @Failure 404 {object} models.ErrorResponse
 // @Router /dishes/{id} [get]
 func GetDishByID(c *gin.Context) {
-    id := c.Param("id")
+    repo := dishRepository(c.Request.Context())
+    if repo == nil {
+        c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+            Success: false,
+            Message: "Repository not initialized",
+        })
+        return
+    }
 
-    var dish models.Dish
-    if err := db.Where("id = ? AND is_active = ?", id, true).First(&dish).Error; err != nil {
+    dishID, err := strconv.Atoi(c.Param("id"))
+    if err != nil {
+        c.JSON(http.StatusBadRequest, models.ErrorResponse{
+            Success: false,
+            Message: "Invalid dish ID",
+        })
+        return
+    }
+
+    dish, err := repo.FindByID(uint(dishID))
+    if err != nil || dish == nil || !dish.IsActive {
         c.JSON(http.StatusNotFound, models.ErrorResponse{
             Success: false,
             Message: "Dish not found",
@@ -148,35 +164,15 @@ func AdminGetDishes(c *gin.Context) {
         return
     }
 
-    var dishes []models.Dish
-    var total int64
-
-    query := db.Model(&models.Dish{})
-
-    // Apply filters
-    if params.Search != "" {
-        query = query.Where("name ILIKE ? OR description ILIKE ?", "%"+params.Search+"%", "%"+params.Search+"%")
+    repo := dishRepository(c.Request.Context())
+    if repo == nil {
+        c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+            Success: false,
+            Message: "Repository not initialized",
+        })
+        return
     }
 
-    if params.IsSeasonal != nil {
-        query = query.Where("is_seasonal = ?", *params.IsSeasonal)
-    }
-
-    if params.IsActive != nil {
-        query = query.Where("is_active = ?", *params.IsActive)
-    }
-
-    if params.Tags != "" {
-        tags := strings.Split(params.Tags, ",")
-        for _, tag := range tags {
-            query = query.Where("tags ILIKE ?", "%"+strings.TrimSpace(tag)+"%")
-        }
-    }
-
-    // Get total count
-    query.Count(&total)
-
-    // Apply pagination
     if params.Limit <= 0 {
         params.Limit = 10
     }
@@ -184,8 +180,25 @@ func AdminGetDishes(c *gin.Context) {
         params.Page = 1
     }
 
+    filter := repository.DishFilter{
+        Search: strings.TrimSpace(params.Search),
+    }
+
+    if params.IsSeasonal != nil {
+        filter.IsSeasonal = params.IsSeasonal
+    }
+
+    if params.IsActive != nil {
+        filter.IsActive = params.IsActive
+    }
+
+    if params.Tags != "" {
+        filter.Tags = strings.Split(params.Tags, ",")
+    }
+
     offset := params.GetOffset()
-    if err := query.Offset(offset).Limit(params.Limit).Order("created_at DESC").Find(&dishes).Error; err != nil {
+    dishes, total, err := repo.List(filter, offset, params.Limit)
+    if err != nil {
         c.JSON(http.StatusInternalServerError, models.ErrorResponse{
             Success: false,
             Message: "Failed to fetch dishes",
