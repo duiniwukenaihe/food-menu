@@ -107,7 +107,8 @@ docker-compose up -d
 
 #### Backend
 - `DATABASE_URL`: PostgreSQL connection string
-- `JWT_SECRET`: Secret key for JWT tokens
+- `JWT_SECRET`: Secret key for JWT tokens (required for production)
+- `JWT_EXPIRY_HOURS`: Token expiry time in hours (default: 24)
 - `PORT`: Server port (default: 8080)
 - `ENVIRONMENT`: Environment (development/production)
 
