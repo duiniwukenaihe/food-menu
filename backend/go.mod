@@ -6,11 +6,14 @@ toolchain go1.24.10
 
 require (
     github.com/gin-gonic/gin v1.9.1
+    github.com/go-sql-driver/mysql v1.7.1
     github.com/golang-jwt/jwt/v5 v5.0.0
+    github.com/golang-migrate/migrate/v4 v4.16.2
     github.com/google/uuid v1.6.0
     github.com/minio/minio-go/v7 v7.0.66
     github.com/stretchr/testify v1.8.3
     golang.org/x/crypto v0.28.0
+    gorm.io/driver/mysql v1.5.2
     gorm.io/driver/postgres v1.5.2
     gorm.io/gorm v1.25.4
 )
