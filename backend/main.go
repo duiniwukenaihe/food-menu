@@ -1,13 +1,15 @@
 package main
 
 import (
-    "log"
-    "os"
+	"fmt"
 
-    "github.com/gin-gonic/gin"
-    "example.com/app/internal/api"
-    "example.com/app/internal/database"
-    "example.com/app/internal/models"
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
+	"example.com/app/internal/api"
+	"example.com/app/internal/config"
+	"example.com/app/internal/database"
+	"example.com/app/internal/models"
+	"example.com/app/pkg/logger"
 )
 
 // @title Full-Stack App API
@@ -31,117 +33,140 @@ import (
 // @description Type "Bearer" followed by a space and JWT token.
 
 func main() {
-    // Initialize database
-    db, err := database.InitDB()
-    if err != nil {
-        log.Fatal("Failed to connect to database:", err)
-    }
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Println("Failed to load configuration:", err)
+		return
+	}
 
-    // Initialize API with database
-    api.InitDatabase(db)
+	if err := logger.Init(cfg.IsDevelopment()); err != nil {
+		fmt.Println("Failed to initialize logger:", err)
+		return
+	}
+	defer logger.Sync()
 
-    // Initialize storage service
-    if err := api.InitStorageService(); err != nil {
-        log.Fatal("Failed to initialize storage service:", err)
-    }
+	logger.Info("Starting application",
+		zap.String("environment", cfg.Server.Environment),
+		zap.String("port", cfg.Server.Port),
+	)
 
-    // Auto-migrate the schema
-    err = db.AutoMigrate(&models.User{}, &models.Content{}, &models.Category{}, &models.Recommendation{}, &models.Dish{}, &models.Media{})
-    if err != nil {
-        log.Fatal("Failed to migrate database:", err)
-    }
+	// Initialize database
+	db, err := database.InitDB()
+	if err != nil {
+		logger.Fatal("Failed to connect to database",
+			zap.Error(err),
+		)
+	}
 
-    // Set Gin mode
-    if os.Getenv("ENVIRONMENT") == "production" {
-        gin.SetMode(gin.ReleaseMode)
-    }
+	// Initialize API with database
+	api.InitDatabase(db)
 
-    // Initialize router
-    r := gin.Default()
+	// Initialize storage service
+	if err := api.InitStorageService(); err != nil {
+		logger.Fatal("Failed to initialize storage service",
+			zap.Error(err),
+		)
+	}
 
-    // CORS middleware
-    r.Use(func(c *gin.Context) {
-        c.Header("Access-Control-Allow-Origin", "*")
-        c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-        c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+	// Auto-migrate the schema
+	err = db.AutoMigrate(&models.User{}, &models.Content{}, &models.Category{}, &models.Recommendation{}, &models.Dish{}, &models.Media{})
+	if err != nil {
+		logger.Fatal("Failed to migrate database",
+			zap.Error(err),
+		)
+	}
 
-        if c.Request.Method == "OPTIONS" {
-            c.AbortWithStatus(204)
-            return
-        }
+	// Set Gin mode
+	if cfg.IsProduction() {
+		gin.SetMode(gin.ReleaseMode)
+	}
 
-        c.Next()
-    })
+	// Initialize router
+	r := gin.Default()
 
-    // API routes
-    v1 := r.Group("/api/v1")
-    {
-        // Public routes
-        v1.POST("/auth/register", api.Register)
-        v1.POST("/auth/login", api.Login)
-        v1.GET("/content", api.GetContent)
-        v1.GET("/content/:id", api.GetContentByID)
-        v1.GET("/categories", api.GetCategories)
-        v1.GET("/recommendations", api.GetRecommendations)
-        v1.GET("/dishes", api.GetDishes)
-        v1.GET("/dishes/:id", api.GetDishByID)
-        
-        // Media serving (public)
-        v1.GET("/media/*filepath", api.GetMedia)
+	// CORS middleware
+	r.Use(func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 
-        // Protected routes
-        protected := v1.Group("/")
-        protected.Use(api.AuthMiddleware())
-        {
-            protected.GET("/auth/profile", api.GetProfile)
-            protected.PUT("/auth/profile", api.UpdateProfile)
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
 
-            // Admin routes
-            admin := protected.Group("/admin")
-            admin.Use(api.AdminMiddleware())
-            {
-                admin.GET("/users", api.GetUsers)
-                admin.POST("/users", api.CreateUser)
-                admin.PUT("/users/:id", api.UpdateUser)
-                admin.DELETE("/users/:id", api.DeleteUser)
+		c.Next()
+	})
 
-                admin.GET("/content", api.AdminGetContent)
-                admin.POST("/content", api.CreateContent)
-                admin.PUT("/content/:id", api.UpdateContent)
-                admin.DELETE("/content/:id", api.DeleteContent)
+	// API routes
+	v1 := r.Group("/api/v1")
+	{
+		// Public routes
+		v1.POST("/auth/register", api.Register)
+		v1.POST("/auth/login", api.Login)
+		v1.GET("/content", api.GetContent)
+		v1.GET("/content/:id", api.GetContentByID)
+		v1.GET("/categories", api.GetCategories)
+		v1.GET("/recommendations", api.GetRecommendations)
+		v1.GET("/dishes", api.GetDishes)
+		v1.GET("/dishes/:id", api.GetDishByID)
 
-                admin.GET("/categories", api.AdminGetCategories)
-                admin.POST("/categories", api.CreateCategory)
-                admin.PUT("/categories/:id", api.UpdateCategory)
-                admin.DELETE("/categories/:id", api.DeleteCategory)
-                
-                // Dish management
-                admin.GET("/dishes", api.AdminGetDishes)
-                admin.POST("/dishes", api.CreateDish)
-                admin.PUT("/dishes/:id", api.UpdateDish)
-                admin.DELETE("/dishes/:id", api.DeleteDish)
-                
-                // Media upload
-                admin.POST("/media/upload-url", api.GetUploadURL)
-                admin.POST("/media/upload", api.UploadFile)
-                admin.DELETE("/media", api.DeleteMedia)
-            }
-        }
-    }
+		// Media serving (public)
+		v1.GET("/media/*filepath", api.GetMedia)
 
-    // Health check
-    r.GET("/health", func(c *gin.Context) {
-        c.JSON(200, gin.H{"status": "ok"})
-    })
+		// Protected routes
+		protected := v1.Group("/")
+		protected.Use(api.AuthMiddleware())
+		{
+			protected.GET("/auth/profile", api.GetProfile)
+			protected.PUT("/auth/profile", api.UpdateProfile)
 
-    port := os.Getenv("PORT")
-    if port == "" {
-        port = "8080"
-    }
+			// Admin routes
+			admin := protected.Group("/admin")
+			admin.Use(api.AdminMiddleware())
+			{
+				admin.GET("/users", api.GetUsers)
+				admin.POST("/users", api.CreateUser)
+				admin.PUT("/users/:id", api.UpdateUser)
+				admin.DELETE("/users/:id", api.DeleteUser)
 
-    log.Printf("Server starting on port %s", port)
-    
-    if err := r.Run(":" + port); err != nil {
-        log.Fatal("Failed to start server:", err)
-    }
+				admin.GET("/content", api.AdminGetContent)
+				admin.POST("/content", api.CreateContent)
+				admin.PUT("/content/:id", api.UpdateContent)
+				admin.DELETE("/content/:id", api.DeleteContent)
+
+				admin.GET("/categories", api.AdminGetCategories)
+				admin.POST("/categories", api.CreateCategory)
+				admin.PUT("/categories/:id", api.UpdateCategory)
+				admin.DELETE("/categories/:id", api.DeleteCategory)
+
+				// Dish management
+				admin.GET("/dishes", api.AdminGetDishes)
+				admin.POST("/dishes", api.CreateDish)
+				admin.PUT("/dishes/:id", api.UpdateDish)
+				admin.DELETE("/dishes/:id", api.DeleteDish)
+
+				// Media upload
+				admin.POST("/media/upload-url", api.GetUploadURL)
+				admin.POST("/media/upload", api.UploadFile)
+				admin.DELETE("/media", api.DeleteMedia)
+			}
+		}
+	}
+
+	// Health check
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
+	addr := ":" + cfg.Server.Port
+	logger.Info("Server starting",
+		zap.String("address", addr),
+	)
+
+	if err := r.Run(addr); err != nil {
+		logger.Fatal("Failed to start server",
+			zap.Error(err),
+		)
+	}
 }
