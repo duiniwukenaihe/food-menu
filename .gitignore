@@ -1,0 +1,81 @@
+# 编译输出
+/backend/food-ordering-server
+/backend/main
+/backend/*.exe
+/backend/*.dll
+/backend/*.so
+/backend/*.dylib
+
+# Go模块
+/backend/vendor/
+
+# 环境配置
+/backend/.env
+/frontend/.env.local
+/frontend/.env.*.local
+
+# 依赖目录
+/backend/node_modules/
+/frontend/node_modules/
+
+# 构建输出
+/frontend/dist/
+/frontend/build/
+
+# 日志文件
+*.log
+logs/
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 临时文件
+*.tmp
+*.temp
+
+# 上传文件
+uploads/
+static/uploads/
+
+# 测试覆盖率
+coverage/
+*.cover
+
+# Docker
+.dockerignore
+
+# 备份文件
+*.bak
+*.backup
+
+# 压缩文件
+*.tar.gz
+*.zip
+*.rar
+
+# 缓存
+.cache/
+.parcel-cache/
+
+# ESLint
+.eslintcache
+
+# TypeScript
+*.tsbuildinfo
+
+# Vite
+/frontend/dist-ssr/
+/frontend/*.local
