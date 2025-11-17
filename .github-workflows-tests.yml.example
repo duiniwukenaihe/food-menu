@@ -1,0 +1,74 @@
+name: Go API Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_DB: food_ordering_test
+          POSTGRES_PASSWORD: password
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Download dependencies
+      working-directory: backend
+      run: |
+        go mod tidy
+        go mod download
+
+    - name: Run API Handler Tests
+      working-directory: backend
+      env:
+        TEST_DATABASE_URL: postgres://postgres:password@localhost:5432/food_ordering_test?sslmode=disable
+      run: go test -v ./handlers
+
+    - name: Run tests with race detector
+      working-directory: backend
+      env:
+        TEST_DATABASE_URL: postgres://postgres:password@localhost:5432/food_ordering_test?sslmode=disable
+      run: go test -race ./handlers
+
+    - name: Generate coverage report
+      working-directory: backend
+      env:
+        TEST_DATABASE_URL: postgres://postgres:password@localhost:5432/food_ordering_test?sslmode=disable
+      run: go test -coverprofile=coverage.out ./handlers
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./backend/coverage.out
+        flags: backend-tests
+        name: go-api-tests
+        fail_ci_if_error: false
