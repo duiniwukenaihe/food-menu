@@ -9,6 +9,17 @@ API_BASE="http://localhost:8080/api/v1"
 echo "🧪 食物点餐系统 - 功能测试"
 echo "=================================="
 
+# 检查是否只运行Go单元测试
+if [ "$1" == "unit" ]; then
+    echo ""
+    echo "🧪 运行Go单元测试..."
+    echo "======================================"
+    cd backend
+    export TEST_DATABASE_URL="postgres://postgres:password@localhost/food_ordering_test?sslmode=disable"
+    go test -v ./handlers
+    exit $?
+fi
+
 # 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
