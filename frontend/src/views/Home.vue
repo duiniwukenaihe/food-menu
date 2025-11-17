@@ -57,7 +57,7 @@
               class="dish-card"
               @click="goToDishDetail(dish.id)"
             >
-              <img :src="dish.image_url || '/placeholder-food.jpg'" :alt="dish.name" class="dish-image" />
+              <img :src="dish.image_url || '/placeholder-food.svg'" :alt="dish.name" class="dish-image" />
               <div class="dish-info">
                 <h3>{{ dish.name }}</h3>
                 <p class="price">¥{{ dish.price }}</p>
@@ -111,7 +111,7 @@
               class="dish-card"
               @click="goToDishDetail(dish.id)"
             >
-              <img :src="dish.image_url || '/placeholder-food.jpg'" :alt="dish.name" class="dish-image" />
+              <img :src="dish.image_url || '/placeholder-food.svg'" :alt="dish.name" class="dish-image" />
               <div class="dish-info">
                 <h3>{{ dish.name }}</h3>
                 <p class="price">¥{{ dish.price }}</p>
@@ -160,7 +160,7 @@
               class="dish-card"
               @click="goToDishDetail(dish.id)"
             >
-              <img :src="dish.image_url || '/placeholder-food.jpg'" :alt="dish.name" class="dish-image" />
+              <img :src="dish.image_url || '/placeholder-food.svg'" :alt="dish.name" class="dish-image" />
               <div class="dish-info">
                 <h3>{{ dish.name }}</h3>
                 <p class="description">{{ dish.description }}</p>

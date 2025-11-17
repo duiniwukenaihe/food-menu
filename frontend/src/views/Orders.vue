@@ -45,7 +45,7 @@
                 class="order-item"
               >
                 <img 
-                  :src="item.dish?.image_url || '/placeholder-food.jpg'" 
+                  :src="item.dish?.image_url || '/placeholder-food.svg'" 
                   :alt="item.dish?.name" 
                   class="item-image"
                 />
