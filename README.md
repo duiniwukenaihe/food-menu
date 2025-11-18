@@ -269,6 +269,24 @@ docker-compose up -d
 - [PostgreSQL](https://www.postgresql.org/) - 数据库
 - [GORM](https://gorm.io/) - Go ORM库
 
+## 🏗️ 基础设施
+
+项目包含 Terraform 基础设施代码，用于在 Proxmox VE 上部署 Kubernetes 集群：
+
+- **位置**: `infrastructure/terraform/`
+- **用途**: 自动化部署和管理 Kubernetes 基础设施
+- **文档**: 查看 [infrastructure/README.md](infrastructure/README.md)
+
+快速开始：
+```bash
+cd infrastructure/terraform
+cp terraform.tfvars.example terraform.tfvars
+# 编辑配置文件
+terraform init
+terraform plan
+terraform apply
+```
+
 ## 📞 联系方式
 
 如有问题或建议，请通过以下方式联系：
