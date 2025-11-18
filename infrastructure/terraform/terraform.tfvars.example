@@ -1,0 +1,43 @@
+# Kubernetes Cluster Configuration
+cluster_name = "k8s-prod-cluster"
+region = "us-west-2"
+
+# Networking Configuration
+vpc_cidr = "10.0.0.0/16"
+public_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+private_subnet_cidrs = ["10.0.11.0/24", "10.0.12.0/24", "10.0.13.0/24"]
+availability_zones = ["us-west-2a", "us-west-2b", "us-west-2c"]
+
+# Node Configuration
+master_count = 3
+worker_count = 5
+master_instance_type = "t3.medium"
+worker_instance_type = "t3.large"
+
+# Kubernetes Configuration
+kubernetes_version = "1.30.0"
+network_plugin = "flannel"  # Options: flannel, cilium, calico
+pod_network_cidr = "10.244.0.0/16"
+
+# Storage Configuration
+root_volume_size = 30
+root_volume_type = "gp3"
+data_volume_size = 100
+data_volume_type = "gp3"
+
+# SSH Configuration
+ssh_key_name = "k8s-cluster-key"
+# ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ..." # Uncomment and add your public key
+
+# Monitoring and Performance
+enable_monitoring = true
+enable_ebs_optimization = true
+
+# Tags
+tags = {
+  "Project" = "kubernetes-cluster"
+  "Environment" = "production"
+  "ManagedBy" = "terraform"
+  "Owner" = "devops-team"
+  "CostCenter" = "engineering"
+}
