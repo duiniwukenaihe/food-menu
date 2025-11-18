@@ -1,0 +1,24 @@
+# Proxmox Configuration
+proxmox_node          = "pve"
+proxmox_api_url       = "https://your-proxmox-server:8006/api2/json"
+proxmox_api_token_id  = "your-token-id"
+proxmox_api_token_secret = "your-token-secret"
+proxmox_tls_insecure = true
+
+# Ubuntu Template Configuration
+ubuntu_template_config = {
+  vm_id              = 9001
+  storage_pool       = "local-lvm"
+  network_bridge     = "vmbr0"
+  cores              = 2
+  memory             = 2048
+  disk_size          = "20G"
+  cloud_init_storage = "local-lvm"
+}
+
+# Ubuntu Image Configuration
+ubuntu_image_config = {
+  version             = "22.04"
+  architecture        = "amd64"
+  interactive_replace = true
+}

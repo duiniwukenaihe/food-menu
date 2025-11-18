@@ -1,3 +1,17 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+terraform.tfvars.backup
+crash.log
+crash.*.log
+
+# Downloads directory for Ubuntu images
+downloads/
+*.img
+
 # 编译输出
 /backend/food-ordering-server
 /backend/main
