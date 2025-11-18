@@ -1,254 +1,133 @@
-# Kubernetes Cluster Configuration
-cluster_name = "k8s-prod-cluster"
-region = "us-west-2"
-
-# Networking Configuration
-vpc_cidr = "10.0.0.0/16"
-public_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
-private_subnet_cidrs = ["10.0.11.0/24", "10.0.12.0/24", "10.0.13.0/24"]
-availability_zones = ["us-west-2a", "us-west-2b", "us-west-2c"]
-
-# Node Configuration
-master_count = 3
-worker_count = 5
-master_instance_type = "t3.medium"
-worker_instance_type = "t3.large"
-
-# Kubernetes Configuration
-kubernetes_version = "1.30.0"
-network_plugin = "flannel"  # Options: flannel, cilium, calico
-pod_network_cidr = "10.244.0.0/16"
-
-# Storage Configuration
-root_volume_size = 30
-root_volume_type = "gp3"
-data_volume_size = 100
-data_volume_type = "gp3"
-
-# SSH Configuration
-ssh_key_name = "k8s-cluster-key"
-# ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ..." # Uncomment and add your public key
-
-# Monitoring and Performance
-enable_monitoring = true
-enable_ebs_optimization = true
-
-# Tags
-tags = {
-  "Project" = "kubernetes-cluster"
-  "Environment" = "production"
-  "ManagedBy" = "terraform"
-  "Owner" = "devops-team"
-  "CostCenter" = "engineering"
-}
 # =============================================================================
-# Proxmox Connection Configuration
-# =============================================================================
-# 
-# IMPORTANT: Copy this file to terraform.tfvars and fill in your values
-# The terraform.tfvars file is git-ignored for security
-#
-# Authentication methods:
-# 1. Username/Password: Set proxmox_username and proxmox_password
-#    OR set PROXMOX_VE_USERNAME and PROXMOX_VE_PASSWORD environment variables
-# 2. API Token: Set proxmox_api_token
-#    OR set PROXMOX_VE_API_TOKEN environment variable
-#    Format: user@realm!tokenid=secret
-#    Example: root@pam!terraform=12345678-1234-1234-1234-123456789abc
-#
-# For SSH operations, either:
-# - Set proxmox_ssh_private_key to path of your private key
-# - OR set PROXMOX_VE_SSH_PRIVATE_KEY environment variable to the key content
-
-proxmox_endpoint        = "https://192.168.0.200:8006"
-proxmox_username        = "root@pam"
-# proxmox_password      = "your-password-here"  # Or use PROXMOX_VE_PASSWORD env var
-# proxmox_api_token     = ""  # Alternative to username/password
-proxmox_insecure        = true  # Set to false if using valid TLS certificates
-proxmox_ssh_username    = "root"
-# proxmox_ssh_private_key = "~/.ssh/id_rsa"  # Or use PROXMOX_VE_SSH_PRIVATE_KEY env var
-
-# =============================================================================
-# Proxmox Resource Configuration
+# Proxmox Configuration
 # =============================================================================
 
-proxmox_node_name       = "pve"
-proxmox_storage         = "local-lvm"
-proxmox_iso_storage     = "local"
-proxmox_network_bridge  = "vmbr0"
-# proxmox_vlan_tag      = 100  # Uncomment to use VLAN tagging
+# Proxmox API URL (required)
+proxmox_api_url = "https://192.168.0.200:8006/api2/json"
+
+# Proxmox username (required if not using API token)
+proxmox_user = "root@pam"
+
+# Proxmox password (required if not using API token, can use env var PROXMOX_VE_PASSWORD)
+proxmox_password = "your_password_here"
+
+# Proxmox node name where VMs will be created
+proxmox_node = "proxmox1"
+
+# Proxmox host IP for SSH operations
+proxmox_host = "192.168.0.200"
+
+# SSH user for Proxmox host operations
+proxmox_ssh_user = "root"
+
+# Path to SSH private key for Proxmox host access
+proxmox_ssh_key = "~/.ssh/id_rsa"
 
 # =============================================================================
-# VM Template Configuration
+# Image and Template Configuration
 # =============================================================================
 
-template_name           = "k8s-ubuntu-jammy-template"
-template_vm_id          = 9000
-template_image_url      = "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
-# template_image_checksum = ""  # Optional: Add checksum for verification
+# Ubuntu cloud image URL
+image_url = "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
+
+# Ubuntu cloud image base URL
+image_base_url = "https://cloud-images.ubuntu.com/jammy/current"
+
+# Image filename
+image_name = "jammy-server-cloudimg-amd64.img"
+
+# VM template ID (must be unique in Proxmox)
+template_id = 9001
+
+# Proxmox storage pool for VM disks
+storage = "local"
+
+# Network bridge for VM network interfaces
+bridge = "vmbr0"
 
 # =============================================================================
-# SSH Key Configuration
+# User Configuration
 # =============================================================================
-# Provide your SSH public key for VM access
-# Either set ssh_public_key directly or ssh_public_key_file path
 
-# ssh_public_key         = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ..."
-ssh_public_key_file      = "~/.ssh/id_rsa.pub"
+# Default username for VM instances
+username = "ubuntu"
 
-# Additional authorized keys (optional)
-# ssh_authorized_keys = [
-#   "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ... user1@host",
-#   "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ... user2@host",
-# ]
+# Default password for VM instances
+password = "your_vm_password_here"
+
+# Path to SSH private key for VM access
+ssh_private_key_path = "~/.ssh/id_rsa"
+
+# Path to SSH public key for VM access
+ssh_public_key_path = "~/.ssh/id_rsa.pub"
 
 # =============================================================================
-# Control Plane Configuration
+# Master Node Configuration
 # =============================================================================
-# Define your control plane (master) nodes
-# For high availability, use an odd number of control plane nodes (1, 3, 5)
 
-control_plane_count      = 3
-control_plane_cpu_cores  = 2
-control_plane_memory_mb  = 4096
-control_plane_disk_size_gb = 50
+# Number of master nodes (1-3 recommended for production)
+master_count = 1
 
-# Detailed control plane node configuration
-# Customize individual nodes if needed
-control_plane_nodes = {
-  master-1 = {
-    vm_id        = 101
-    name         = "k8s-master-1"
-    node_name    = "pve"
-    cpu_cores    = 2
-    memory_mb    = 4096
-    disk_size_gb = 50
-    ip_address   = "192.168.0.101"
-  }
-  master-2 = {
-    vm_id        = 102
-    name         = "k8s-master-2"
-    node_name    = "pve"
-    cpu_cores    = 2
-    memory_mb    = 4096
-    disk_size_gb = 50
-    ip_address   = "192.168.0.102"
-  }
-  master-3 = {
-    vm_id        = 103
-    name         = "k8s-master-3"
-    node_name    = "pve"
-    cpu_cores    = 2
-    memory_mb    = 4096
-    disk_size_gb = 50
-    ip_address   = "192.168.0.103"
-  }
-}
+# Starting VM ID for master nodes (100-499 range)
+master_vmid_start = 501
+
+# CPU cores per master node
+master_cores = 4
+
+# Memory in MB per master node
+master_memory = 8192
+
+# Disk size per master node
+master_disk_size = "50G"
 
 # =============================================================================
 # Worker Node Configuration
 # =============================================================================
-# Define your worker nodes where application workloads will run
 
-worker_count            = 3
-worker_cpu_cores        = 4
-worker_memory_mb        = 8192
-worker_disk_size_gb     = 100
+# Number of worker nodes
+worker_count = 2
 
-# Detailed worker node configuration
-worker_nodes = {
-  worker-1 = {
-    vm_id        = 201
-    name         = "k8s-worker-1"
-    node_name    = "pve"
-    cpu_cores    = 4
-    memory_mb    = 8192
-    disk_size_gb = 100
-    ip_address   = "192.168.0.201"
-  }
-  worker-2 = {
-    vm_id        = 202
-    name         = "k8s-worker-2"
-    node_name    = "pve"
-    cpu_cores    = 4
-    memory_mb    = 8192
-    disk_size_gb = 100
-    ip_address   = "192.168.0.202"
-  }
-  worker-3 = {
-    vm_id        = 203
-    name         = "k8s-worker-3"
-    node_name    = "pve"
-    cpu_cores    = 4
-    memory_mb    = 8192
-    disk_size_gb = 100
-    ip_address   = "192.168.0.203"
-  }
-}
+# Starting VM ID for worker nodes (500-999 range)
+worker_vmid_start = 601
 
-# =============================================================================
-# Network Configuration
-# =============================================================================
+# CPU cores per worker node
+worker_cores = 8
 
-network_gateway         = "192.168.0.1"
-network_dns_servers     = ["8.8.8.8", "8.8.4.4"]
-network_domain          = "local"
+# Memory in MB per worker node
+worker_memory = 16384
+
+# Disk size per worker node
+worker_disk_size = "100G"
 
 # =============================================================================
 # Kubernetes Configuration
 # =============================================================================
 
-kubernetes_version      = "1.28.0"
-kubernetes_pod_network_cidr = "10.244.0.0/16"
-kubernetes_service_cidr = "10.96.0.0/12"
-kubernetes_cni          = "calico"  # Options: calico, flannel, cilium, weave
+# Kubernetes version to install
+k8s_version = "1.30.0"
 
-# Optional features
-kubernetes_enable_monitoring = false
-kubernetes_enable_logging    = false
+# Pod network CIDR for Kubernetes
+pod_network_cidr = "10.244.0.0/16"
 
-# =============================================================================
-# Node Mapping (Multi-Node Proxmox Cluster)
-# =============================================================================
-# If you have a multi-node Proxmox cluster, define node mappings here
-# This helps distribute VMs across multiple Proxmox hosts
+# Network plugin (flannel, cilium, calico)
+network_plugin = "flannel"
 
-# node_map = {
-#   "zone-a" = "pve1"
-#   "zone-b" = "pve2"
-#   "zone-c" = "pve3"
-# }
+# Container image repository for Kubernetes
+image_repository = "registry.aliyuncs.com/google_containers"
 
 # =============================================================================
-# Tags and Metadata
+# Optional Configuration
 # =============================================================================
 
-tags         = ["kubernetes", "terraform", "proxmox"]
-environment  = "dev"  # Options: dev, staging, prod
-project_name = "k8s-cluster"
+# Cluster name
+cluster_name = "k8s-cluster"
 
-# =============================================================================
-# Example: Production Configuration
-# =============================================================================
-# For production, consider:
-# - 3 or 5 control plane nodes for high availability
-# - More resources per node (CPU, memory, disk)
-# - Enabling monitoring and logging
-# - Using valid TLS certificates (proxmox_insecure = false)
-# - Distributing nodes across multiple Proxmox hosts
-# - Setting up proper backup strategies
-#
-# Example production values:
-# control_plane_count      = 3
-# control_plane_cpu_cores  = 4
-# control_plane_memory_mb  = 8192
-# control_plane_disk_size_gb = 100
-#
-# worker_count            = 5
-# worker_cpu_cores        = 8
-# worker_memory_mb        = 16384
-# worker_disk_size_gb     = 200
-#
-# kubernetes_enable_monitoring = true
-# kubernetes_enable_logging    = true
-# environment                  = "prod"
+# Environment (dev, staging, prod)
+environment = "dev"
+
+# API Token (alternative to username/password)
+# proxmox_api_token_id = "user@realm!tokenid"
+# proxmox_api_token_secret = "your_token_secret_here"
+
+# Skip TLS verification (for self-signed certificates)
+proxmox_insecure = true

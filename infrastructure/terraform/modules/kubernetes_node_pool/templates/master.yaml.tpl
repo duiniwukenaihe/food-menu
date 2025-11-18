@@ -1,6 +1,6 @@
 #cloud-config
 # =============================================================================
-# Cloud-Init Configuration for Kubernetes Worker Nodes
+# Cloud-Init Configuration for Kubernetes Master Nodes
 # =============================================================================
 
 # Hostname configuration
@@ -131,14 +131,44 @@ write_files:
     content: |
       deb https://apt.kubernetes.io/ kubernetes-xenial main
 
-  # Kubernetes worker join script
-  - path: /opt/k8s-join.sh
+  # Kubeadm configuration for master
+  - path: /etc/kubernetes/kubeadm-config.yaml
+    permissions: '0644'
+    content: |
+      apiVersion: kubeadm.k8s.io/v1beta3
+      kind: InitConfiguration
+      localAPIEndpoint:
+        advertiseAddress: 0.0.0.0
+        bindPort: 6443
+      nodeRegistration:
+        criSocket: unix:///var/run/containerd/containerd.sock
+        kubeletExtraArgs:
+          cgroup-driver: systemd
+      ---
+      apiVersion: kubeadm.k8s.io/v1beta3
+      kind: ClusterConfiguration
+      kubernetesVersion: ${k8s_version}
+      controlPlaneEndpoint: "${cluster_name}-master-1:6443"
+      imageRepository: ${image_repository}
+      networking:
+        serviceSubnet: "10.96.0.0/12"
+        podSubnet: "${pod_network_cidr}"
+        dnsDomain: "cluster.local"
+      ---
+      apiVersion: kubelet.config.k8s.io/v1beta1
+      kind: KubeletConfiguration
+      cgroupDriver: systemd
+      serverTLSBootstrap: true
+      rotateCertificates: true
+
+  # Kubernetes master initialization script
+  - path: /opt/k8s-init.sh
     permissions: '0755'
     content: |
       #!/bin/bash
       set -e
       
-      echo "Starting Kubernetes worker setup..."
+      echo "Starting Kubernetes master initialization..."
       
       # Wait for system to be ready
       sleep 30
@@ -175,58 +205,37 @@ write_files:
       # Hold Kubernetes packages
       sudo apt-mark hold kubelet kubeadm kubectl
       
-      # Wait for master to be ready
-      echo "Waiting for master node to be ready..."
-      sleep 60
-      
-      # Try to get join command from master (assuming SSH key access)
-      MASTER_IP="${cluster_name}-master-1"
-      JOIN_COMMAND=""
-      
-      # Try to get join command from master
-      for i in {1..10}; do
-        if ssh -o StrictHostKeyChecking=no -i /home/${username}/.ssh/id_rsa ${username}@${MASTER_IP} "test -f /tmp/join-command.sh" 2>/dev/null; then
-          JOIN_COMMAND=$(ssh -o StrictHostKeyChecking=no -i /home/${username}/.ssh/id_rsa ${username}@${MASTER_IP} "cat /tmp/join-command.sh")
-          break
-        fi
-        echo "Attempt $i: Master not ready yet, waiting 30 seconds..."
-        sleep 30
-      done
-      
-      if [ -n "$JOIN_COMMAND" ]; then
-        echo "Joining Kubernetes cluster..."
-        sudo $JOIN_COMMAND
+      # Initialize Kubernetes cluster (only on first master)
+      if [ "${node_index}" -eq 1 ]; then
+        echo "Initializing Kubernetes cluster..."
+        sudo kubeadm init --config=/etc/kubernetes/kubeadm-config.yaml --upload-certs
         
-        echo "Worker node joined successfully!"
+        # Configure kubectl for user
+        mkdir -p $HOME/.kube
+        sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+        sudo chown $(id -u):$(id -g) $HOME/.kube/config
+        
+        # Install network plugin
+        if [ "${network_plugin}" = "flannel" ]; then
+          kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
+        elif [ "${network_plugin}" = "calico" ]; then
+          kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/tigera-operator.yaml
+          kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/custom-resources.yaml
+        fi
+        
+        # Generate join command for workers
+        sudo kubeadm token create --print-join-command > /tmp/join-command.sh
+        chmod +x /tmp/join-command.sh
+        
+        echo "Kubernetes master initialized successfully!"
+        echo "Join command saved to /tmp/join-command.sh"
       else
-        echo "Could not get join command from master. Manual join required."
-        echo "Please run the following on the master to get the join command:"
-        echo "sudo kubeadm token create --print-join-command"
+        echo "This is master node ${node_index}. Waiting for join command..."
       fi
       
       # Enable and start kubelet
       sudo systemctl enable kubelet
       sudo systemctl start kubelet
-
-  # Manual join instructions
-  - path: /tmp/join-instructions.txt
-    permissions: '0644'
-    content: |
-      KUBERNETES WORKER NODE JOIN INSTRUCTIONS
-      ========================================
-      
-      If the automatic join failed, you can join this worker manually:
-      
-      1. SSH to the master node:
-         ssh ${username}@${cluster_name}-master-1
-      
-      2. Get the join command:
-         sudo kubeadm token create --print-join-command
-      
-      3. Copy the output and run it on this worker node with sudo
-      
-      4. Verify the node joined:
-         kubectl get nodes
 
   # Environment variables
   - path: /etc/environment
@@ -240,15 +249,15 @@ runcmd:
   # Add user to docker group
   - usermod -aG docker ${username}
   
-  # Make join script executable
-  - chmod +x /opt/k8s-join.sh
+  # Make init script executable
+  - chmod +x /opt/k8s-init.sh
   
-  # Run Kubernetes join in background
-  - nohup /opt/k8s-join.sh > /var/log/k8s-join.log 2>&1 &
+  # Run Kubernetes initialization in background
+  - nohup /opt/k8s-init.sh > /var/log/k8s-init.log 2>&1 &
 
 # Power state
 power_state:
   mode: reboot
 
 # Final message
-final_message: "Kubernetes worker node setup completed after $UPTIME seconds"
+final_message: "Kubernetes master node setup completed after $UPTIME seconds"
