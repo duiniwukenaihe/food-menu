@@ -1,79 +1,40 @@
+# =============================================================================
+# Kubernetes Cluster Outputs
+# =============================================================================
+
 output "cluster_name" {
   description = "Name of the Kubernetes cluster"
   value       = var.cluster_name
 }
 
-output "vpc_id" {
-  description = "ID of the VPC"
-  value       = module.vpc.vpc_id
+output "kubernetes_version" {
+  description = "Kubernetes version installed"
+  value       = var.k8s_version
 }
 
-output "public_subnet_ids" {
-  description = "IDs of the public subnets"
-  value       = module.vpc.public_subnet_ids
+output "cluster_endpoint" {
+  description = "Kubernetes API server endpoint"
+  value       = module.kubernetes_nodes.master_ips[0]
 }
 
-output "private_subnet_ids" {
-  description = "IDs of the private subnets"
-  value       = module.vpc.private_subnet_ids
+output "master_nodes" {
+  description = "Information about master nodes"
+  value = {
+    count = var.master_count
+    vms   = module.kubernetes_nodes.master_vms
+    ips   = module.kubernetes_nodes.master_ips
+    names = module.kubernetes_nodes.master_names
+  }
 }
 
-output "master_instance_ids" {
-  description = "IDs of the master instances"
-  value       = module.k8s_nodes.master_instance_ids
-}
-
-output "worker_instance_ids" {
-  description = "IDs of the worker instances"
-  value       = module.k8s_nodes.worker_instance_ids
-}
-
-output "master_public_ips" {
-  description = "Public IPs of the master instances"
-  value       = module.k8s_nodes.master_public_ips
-}
-
-output "worker_public_ips" {
-  description = "Public IPs of the worker instances"
-  value       = module.k8s_nodes.worker_public_ips
-}
-
-output "master_private_ips" {
-  description = "Private IPs of the master instances"
-  value       = module.k8s_nodes.master_private_ips
-}
-
-output "worker_private_ips" {
-  description = "Private IPs of the worker instances"
-  value       = module.k8s_nodes.worker_private_ips
-}
-
-output "kubeadm_join_command" {
-  description = "Kubeadm join command for worker nodes"
-  value       = module.k8s_nodes.kubeadm_join_command
-  sensitive   = true
-}
-
-output "kubeadm_join_token" {
-  description = "Kubeadm join token"
-  value       = module.k8s_nodes.kubeadm_join_token
-  sensitive   = true
-}
-
-output "kubeadm_ca_cert_hash" {
-  description = "Kubeadm CA cert hash"
-  value       = module.k8s_nodes.kubeadm_ca_cert_hash
-  sensitive   = true
-}
-
-output "security_group_id" {
-  description = "ID of the Kubernetes security group"
-  value       = module.k8s_nodes.security_group_id
-}
-
-output "ssh_key_name" {
-  description = "SSH key pair name"
-  value       = var.ssh_key_name
+output "worker_nodes" {
+  description = "Information about worker nodes"
+  value = {
+    count = var.worker_count
+    vms   = module.kubernetes_nodes.worker_vms
+    ips   = module.kubernetes_nodes.worker_ips
+    names = module.kubernetes_nodes.worker_names
+  }
 }
 
 output "network_plugin" {
@@ -86,160 +47,59 @@ output "pod_network_cidr" {
   value       = var.pod_network_cidr
 }
 
-output "kubernetes_version" {
-  description = "Kubernetes version"
-  value       = var.kubernetes_version
-}
-
-output "cluster_endpoint" {
-  description = "Kubernetes API server endpoint"
-  value       = module.k8s_nodes.cluster_endpoint
-}
-
-output "kubeconfig_path" {
-  description = "Path to the kubeconfig file"
-  value       = module.k8s_nodes.kubeconfig_path
-}
-# =============================================================================
-# Template Outputs
-# =============================================================================
-
-# Uncomment once the template module is created and enabled
-
-# output "template_id" {
-#   description = "The VM ID of the created template"
-#   value       = module.template.template_id
-# }
-
-# output "template_name" {
-#   description = "The name of the created template"
-#   value       = module.template.template_name
-# }
-
-# =============================================================================
-# Control Plane Outputs
-# =============================================================================
-
-# Uncomment once the control-plane module is created and enabled
-
-# output "control_plane_nodes" {
-#   description = "Information about control plane nodes"
-#   value = {
-#     count      = length(module.control_plane.node_ids)
-#     node_ids   = module.control_plane.node_ids
-#     node_names = module.control_plane.node_names
-#     ip_addresses = module.control_plane.ip_addresses
-#   }
-# }
-
-# output "control_plane_endpoint" {
-#   description = "Kubernetes API server endpoint"
-#   value       = module.control_plane.cluster_endpoint
-# }
-
-# output "control_plane_ssh_connection_strings" {
-#   description = "SSH connection strings for control plane nodes"
-#   value       = module.control_plane.ssh_connection_strings
-# }
-
-# =============================================================================
-# Worker Pool Outputs
-# =============================================================================
-
-# Uncomment once the worker-pool module is created and enabled
-
-# output "worker_nodes" {
-#   description = "Information about worker nodes"
-#   value = {
-#     count      = length(module.worker_pool.node_ids)
-#     node_ids   = module.worker_pool.node_ids
-#     node_names = module.worker_pool.node_names
-#     ip_addresses = module.worker_pool.ip_addresses
-#   }
-# }
-
-# output "worker_ssh_connection_strings" {
-#   description = "SSH connection strings for worker nodes"
-#   value       = module.worker_pool.ssh_connection_strings
-# }
-
-# =============================================================================
-# Cluster Information
-# =============================================================================
-
-# Uncomment once modules are created and enabled
-
-# output "cluster_info" {
-#   description = "Complete cluster information"
-#   value = {
-#     control_plane = {
-#       count      = length(module.control_plane.node_ids)
-#       endpoint   = module.control_plane.cluster_endpoint
-#       nodes      = module.control_plane.node_names
-#       ips        = module.control_plane.ip_addresses
-#     }
-#     workers = {
-#       count = length(module.worker_pool.node_ids)
-#       nodes = module.worker_pool.node_names
-#       ips   = module.worker_pool.ip_addresses
-#     }
-#     kubernetes_version = var.kubernetes_version
-#     cni_plugin        = var.kubernetes_cni
-#     environment       = var.environment
-#   }
-# }
-
-# output "all_node_connection_info" {
-#   description = "Connection information for all nodes in the cluster"
-#   value = {
-#     control_plane = {
-#       for idx, name in module.control_plane.node_names : name => {
-#         vm_id      = module.control_plane.node_ids[idx]
-#         ip_address = module.control_plane.ip_addresses[idx]
-#         ssh_command = "ssh ubuntu@${module.control_plane.ip_addresses[idx]}"
-#       }
-#     }
-#     workers = {
-#       for idx, name in module.worker_pool.node_names : name => {
-#         vm_id      = module.worker_pool.node_ids[idx]
-#         ip_address = module.worker_pool.ip_addresses[idx]
-#         ssh_command = "ssh ubuntu@${module.worker_pool.ip_addresses[idx]}"
-#       }
-#     }
-#   }
-#   sensitive = false
-# }
-
-# =============================================================================
-# Placeholder Outputs (Active until modules are implemented)
-# =============================================================================
-
-output "status" {
-  description = "Current infrastructure status"
+output "ssh_access" {
+  description = "SSH access information"
   value = {
-    message = "Terraform configuration initialized. Module implementations pending."
-    next_steps = [
-      "1. Implement the template module in ./modules/template",
-      "2. Implement the control-plane module in ./modules/control-plane",
-      "3. Implement the worker-pool module in ./modules/worker-pool",
-      "4. Uncomment module blocks in main.tf",
-      "5. Uncomment outputs in outputs.tf"
+    username    = var.username
+    private_key = var.ssh_private_key_path
+    master_ips  = module.kubernetes_nodes.master_ips
+    worker_ips  = module.kubernetes_nodes.worker_ips
+  }
+}
+
+output "template_info" {
+  description = "VM template information"
+  value = {
+    template_id = module.template.template_id
+    template_name = module.template.template_name
+    image_url = var.image_url
+  }
+}
+
+output "proxmox_info" {
+  description = "Proxmox configuration information"
+  value = {
+    api_url = var.proxmox_api_url
+    node    = var.proxmox_node
+    storage = var.storage
+    bridge  = var.bridge
+  }
+}
+
+# =============================================================================
+# Connection Commands
+# =============================================================================
+
+output "connect_commands" {
+  description = "SSH connection commands for the cluster nodes"
+  value = {
+    master_ssh = [
+      for i, ip in module.kubernetes_nodes.master_ips :
+      "ssh -i ${var.ssh_private_key_path} ${var.username}@${ip}"
+    ]
+    worker_ssh = [
+      for i, ip in module.kubernetes_nodes.worker_ips :
+      "ssh -i ${var.ssh_private_key_path} ${var.username}@${ip}"
     ]
   }
 }
 
-output "configuration_summary" {
-  description = "Summary of the current configuration"
+output "kubectl_commands" {
+  description = "Useful kubectl commands"
   value = {
-    proxmox_endpoint    = var.proxmox_endpoint
-    proxmox_node        = var.proxmox_node_name
-    storage             = var.proxmox_storage
-    network_bridge      = var.proxmox_network_bridge
-    control_plane_count = var.control_plane_count
-    worker_count        = var.worker_count
-    kubernetes_version  = var.kubernetes_version
-    cni_plugin          = var.kubernetes_cni
-    environment         = var.environment
-    project_name        = var.project_name
+    get_nodes = "kubectl get nodes -o wide"
+    get_pods = "kubectl get pods --all-namespaces"
+    cluster_info = "kubectl cluster-info"
+    join_command = "sudo kubeadm token create --print-join-command"
   }
 }

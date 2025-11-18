@@ -230,9 +230,9 @@ write_files:
 
   # Environment variables
   - path: /etc/environment
-    permissions: '0644'
-    append: true
-    content: |
+  permissions: '0644'
+  append: true
+  content: |
       KUBECONFIG=/etc/kubernetes/admin.conf
 
 # Runcmd - Commands to run after boot

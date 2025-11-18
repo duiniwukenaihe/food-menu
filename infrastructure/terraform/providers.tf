@@ -1,26 +1,40 @@
+# =============================================================================
+# Proxmox Provider Configuration
+# =============================================================================
+
 provider "proxmox" {
-  endpoint = var.proxmox_endpoint
+  # API Configuration
+  pm_api_url = var.proxmox_api_url
+  
+  # Authentication - Support both password and API token
+  pm_api_token_id = var.proxmox_api_token_id != "" ? var.proxmox_api_token_id : null
+  pm_api_token_secret = var.proxmox_api_token_secret != "" ? var.proxmox_api_token_secret : null
+  
+  # Fallback to username/password if no API token provided
+  pm_user = var.proxmox_api_token_id == "" ? var.proxmox_user : null
+  pm_password = var.proxmox_api_token_id == "" ? var.proxmox_password : null
+  
+  # TLS Configuration
+  pm_tls_insecure = var.proxmox_insecure
+  
+  # Parallel operations
+  pm_parallel = 4
+  pm_timeout = 600
+}
 
-  # Authentication options (use environment variables or variables):
-  # - For API token authentication:
-  #   Set PROXMOX_VE_API_TOKEN environment variable or use api_token variable
-  # - For username/password authentication:
-  #   Set PROXMOX_VE_USERNAME and PROXMOX_VE_PASSWORD environment variables
-  #   or use username/password variables
-  username  = var.proxmox_username
-  password  = var.proxmox_password
-  api_token = var.proxmox_api_token
+# =============================================================================
+# SSH Provider Configuration (for Proxmox host operations)
+# =============================================================================
 
-  # Skip TLS verification if using self-signed certificates
-  # In production, consider using proper TLS certificates and set this to false
-  insecure = var.proxmox_insecure
-
-  # SSH connection configuration for Proxmox host operations
-  ssh {
-    agent    = false
-    username = var.proxmox_ssh_username
-    # Private key can be provided via environment variable PROXMOX_VE_SSH_PRIVATE_KEY
-    # or via the private_key parameter below
-    private_key = var.proxmox_ssh_private_key != "" ? file(var.proxmox_ssh_private_key) : null
-  }
+provider "ssh" {
+  host = var.proxmox_host
+  user = var.proxmox_ssh_user
+  private_key = file(var.proxmox_ssh_key)
+  
+  # Connection settings
+  port = 22
+  timeout = "60s"
+  
+  # Host key verification (disable for testing, enable for production)
+  host_key = "accept-new"
 }

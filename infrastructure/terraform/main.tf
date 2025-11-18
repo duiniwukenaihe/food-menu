@@ -1,238 +1,183 @@
+# =============================================================================
+# Terraform Kubernetes Cluster on Proxmox
+# =============================================================================
+# This configuration creates a complete Kubernetes cluster on Proxmox VE
+# using the user's specific configuration parameters
+# =============================================================================
+
 terraform {
   required_version = ">= 1.0"
   
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-    local = {
-      source  = "hashicorp/local"
-      version = "~> 2.0"
-    }
-    null = {
-      source  = "hashicorp/null"
-      version = "~> 3.0"
-    }
-  }
+  # Backend configuration can be added here for state management
+  # backend "local" {
+  #   path = "./terraform.tfstate"
+  # }
 }
 
-provider "aws" {
-  region = var.region
-  
-  default_tags {
-    tags = var.tags
-  }
-}
-
-# Data sources
-data "aws_ami" "ubuntu" {
-  most_recent = true
-  
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
-  }
-  
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-  
-  owners = ["099720109477"] # Canonical
-}
-
-# Calculate availability zones if not provided
-locals {
-  availability_zones = length(var.availability_zones) > 0 ? var.availability_zones : slice(data.aws_availability_zones.available.names, 0, 2)
-}
-
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
-# VPC Module
-module "vpc" {
-  source = "./modules/k8s-nodes"
-  
-  cluster_name           = var.cluster_name
-  vpc_cidr              = var.vpc_cidr
-  public_subnet_cidrs   = var.public_subnet_cidrs
-  private_subnet_cidrs  = var.private_subnet_cidrs
-  availability_zones    = local.availability_zones
-  tags                  = var.tags
-  
-  create_vpc = true
-}
-
-# Kubernetes Nodes Module
-module "k8s_nodes" {
-  source = "./modules/k8s-nodes"
-  
-  cluster_name            = var.cluster_name
-  vpc_id                 = module.vpc.vpc_id
-  public_subnet_ids      = module.vpc.public_subnet_ids
-  private_subnet_ids     = module.vpc.private_subnet_ids
-  availability_zones      = local.availability_zones
-  
-  master_instance_type   = var.master_instance_type
-  worker_instance_type   = var.worker_instance_type
-  master_count           = var.master_count
-  worker_count           = var.worker_count
-  
-  ssh_key_name           = var.ssh_key_name
-  ssh_public_key         = var.ssh_public_key
-  
-  network_plugin         = var.network_plugin
-  pod_network_cidr       = var.pod_network_cidr
-  kubernetes_version     = var.kubernetes_version
-  
-  enable_monitoring      = var.enable_monitoring
-  enable_ebs_optimization = var.enable_ebs_optimization
-  root_volume_size       = var.root_volume_size
-  root_volume_type       = var.root_volume_type
-  data_volume_size       = var.data_volume_size
-  data_volume_type       = var.data_volume_type
-  
-  ami_id                 = data.aws_ami.ubuntu.id
-  tags                   = var.tags
-  
-  create_vpc = false
-}
 # =============================================================================
-# Kubernetes on Proxmox - Main Configuration
+# Data Sources
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# VM Template Module
-# -----------------------------------------------------------------------------
-# This module creates a VM template from a cloud-init image that will be used
-# as the base for all Kubernetes nodes (control plane and workers)
-# 
-# Uncomment and configure once the template module is created
+# Get the current user's SSH public key
+data "local_file" "ssh_public_key" {
+  filename = var.ssh_public_key_path
+}
 
-# module "template" {
-#   source = "./modules/template"
-#
-#   vm_id                  = var.template_vm_id
-#   name                   = var.template_name
-#   node_name              = var.proxmox_node_name
-#   storage                = var.proxmox_storage
-#   iso_storage            = var.proxmox_iso_storage
-#   image_url              = var.template_image_url
-#   image_checksum         = var.template_image_checksum
-#   ssh_public_key         = var.ssh_public_key != "" ? var.ssh_public_key : (var.ssh_public_key_file != "" ? file(var.ssh_public_key_file) : "")
-#   ssh_authorized_keys    = var.ssh_authorized_keys
-#   tags                   = concat(var.tags, ["template"])
-# }
+# =============================================================================
+# Modules
+# =============================================================================
 
-# -----------------------------------------------------------------------------
-# Control Plane Module
-# -----------------------------------------------------------------------------
-# This module creates the Kubernetes control plane nodes (masters)
-# Control plane nodes run the Kubernetes API server, scheduler, and controller
-# manager components
-#
-# Uncomment and configure once the control-plane module is created
+# Create VM template from Ubuntu cloud image
+module "template" {
+  source = "./modules/template"
+  
+  # Proxmox Configuration
+  proxmox_api_url = var.proxmox_api_url
+  proxmox_user    = var.proxmox_user
+  proxmox_password = var.proxmox_password
+  proxmox_node    = var.proxmox_node
+  proxmox_ssh_key = var.proxmox_ssh_key
+  
+  # Template Configuration
+  template_id   = var.template_id
+  template_name = "${var.cluster_name}-template"
+  image_url     = var.image_url
+  image_name    = var.image_name
+  storage       = var.storage
+  
+  # SSH Configuration
+  ssh_public_key = data.local_file.ssh_public_key.content
+  
+  # User Configuration
+  username = var.username
+  password = var.password
+}
 
-# module "control_plane" {
-#   source = "./modules/control-plane"
-#
-#   depends_on = [module.template]
-#
-#   template_id            = module.template.template_id
-#   template_name          = module.template.template_name
-#   
-#   node_count             = var.control_plane_count
-#   nodes                  = var.control_plane_nodes
-#   
-#   default_node_name      = var.proxmox_node_name
-#   default_cpu_cores      = var.control_plane_cpu_cores
-#   default_memory_mb      = var.control_plane_memory_mb
-#   default_disk_size_gb   = var.control_plane_disk_size_gb
-#   
-#   storage                = var.proxmox_storage
-#   network_bridge         = var.proxmox_network_bridge
-#   vlan_tag               = var.proxmox_vlan_tag
-#   
-#   network_gateway        = var.network_gateway
-#   network_dns_servers    = var.network_dns_servers
-#   network_domain         = var.network_domain
-#   
-#   kubernetes_version     = var.kubernetes_version
-#   pod_network_cidr       = var.kubernetes_pod_network_cidr
-#   service_cidr           = var.kubernetes_service_cidr
-#   cni_plugin             = var.kubernetes_cni
-#   
-#   tags                   = concat(var.tags, ["control-plane", "master"])
-#   environment            = var.environment
-#   project_name           = var.project_name
-# }
+# Create Kubernetes node pool (master and worker nodes)
+module "kubernetes_nodes" {
+  source = "./modules/kubernetes_node_pool"
+  
+  depends_on = [module.template]
+  
+  # Proxmox Configuration
+  proxmox_api_url = var.proxmox_api_url
+  proxmox_user    = var.proxmox_user
+  proxmox_password = var.proxmox_password
+  proxmox_node    = var.proxmox_node
+  proxmox_ssh_key = var.proxmox_ssh_key
+  
+  # Template Reference
+  template_id = module.template.template_id
+  
+  # Network Configuration
+  bridge = var.bridge
+  
+  # SSH Configuration
+  ssh_public_key = data.local_file.ssh_public_key.content
+  
+  # User Configuration
+  username = var.username
+  password = var.password
+  
+  # Master Node Configuration
+  master_count     = var.master_count
+  master_vmid_start = var.master_vmid_start
+  master_cores     = var.master_cores
+  master_memory    = var.master_memory
+  master_disk_size = var.master_disk_size
+  
+  # Worker Node Configuration
+  worker_count     = var.worker_count
+  worker_vmid_start = var.worker_vmid_start
+  worker_cores     = var.worker_cores
+  worker_memory    = var.worker_memory
+  worker_disk_size = var.worker_disk_size
+  
+  # Kubernetes Configuration
+  k8s_version      = var.k8s_version
+  pod_network_cidr = var.pod_network_cidr
+  network_plugin   = var.network_plugin
+  image_repository = var.image_repository
+  
+  # Cluster Configuration
+  cluster_name = var.cluster_name
+  environment  = var.environment
+  
+  # Tags
+  tags = var.tags
+}
 
-# -----------------------------------------------------------------------------
-# Worker Pool Module
-# -----------------------------------------------------------------------------
-# This module creates the Kubernetes worker nodes
-# Worker nodes run the actual application workloads
-#
-# Uncomment and configure once the worker-pool module is created
+# =============================================================================
+# Local Files for Cloud-Init
+# =============================================================================
 
-# module "worker_pool" {
-#   source = "./modules/worker-pool"
-#
-#   depends_on = [module.template, module.control_plane]
-#
-#   template_id            = module.template.template_id
-#   template_name          = module.template.template_name
-#   
-#   node_count             = var.worker_count
-#   nodes                  = var.worker_nodes
-#   
-#   default_node_name      = var.proxmox_node_name
-#   default_cpu_cores      = var.worker_cpu_cores
-#   default_memory_mb      = var.worker_memory_mb
-#   default_disk_size_gb   = var.worker_disk_size_gb
-#   
-#   storage                = var.proxmox_storage
-#   network_bridge         = var.proxmox_network_bridge
-#   vlan_tag               = var.proxmox_vlan_tag
-#   
-#   network_gateway        = var.network_gateway
-#   network_dns_servers    = var.network_dns_servers
-#   network_domain         = var.network_domain
-#   
-#   control_plane_endpoint = module.control_plane.cluster_endpoint
-#   join_token             = module.control_plane.join_token
-#   
-#   tags                   = concat(var.tags, ["worker"])
-#   environment            = var.environment
-#   project_name           = var.project_name
-# }
+# Generate cloud-init configuration for master nodes
+resource "local_file" "master_cloud_init" {
+  for_each = toset([for i in range(var.master_count) : "master-${i}"])
+  
+  content = templatefile("${path.module}/cloud-init/master.yaml.tpl", {
+    hostname = "${var.cluster_name}-${each.key}"
+    username = var.username
+    password = var.password
+    ssh_public_key = data.local_file.ssh_public_key.content
+    
+    # Kubernetes Configuration
+    k8s_version = var.k8s_version
+    pod_network_cidr = var.pod_network_cidr
+    network_plugin = var.network_plugin
+    image_repository = var.image_repository
+    is_master = true
+    cluster_name = var.cluster_name
+  })
+  
+  filename = "${path.module}/cloud-init/generated/${each.key}-cloud-init.yaml"
+}
 
-# -----------------------------------------------------------------------------
-# Local Variables
-# -----------------------------------------------------------------------------
+# Generate cloud-init configuration for worker nodes
+resource "local_file" "worker_cloud_init" {
+  for_each = toset([for i in range(var.worker_count) : "worker-${i}"])
+  
+  content = templatefile("${path.module}/cloud-init/worker.yaml.tpl", {
+    hostname = "${var.cluster_name}-${each.key}"
+    username = var.username
+    password = var.password
+    ssh_public_key = data.local_file.ssh_public_key.content
+    
+    # Kubernetes Configuration
+    k8s_version = var.k8s_version
+    pod_network_cidr = var.pod_network_cidr
+    network_plugin = var.network_plugin
+    image_repository = var.image_repository
+    is_master = false
+    cluster_name = var.cluster_name
+  })
+  
+  filename = "${path.module}/cloud-init/generated/${each.key}-cloud-init.yaml"
+}
 
-locals {
-  # Common tags for all resources
-  common_tags = concat(
-    var.tags,
-    [
-      "environment:${var.environment}",
-      "project:${var.project_name}",
-      "managed-by:terraform"
-    ]
-  )
+# =============================================================================
+# Null Resources for Additional Setup
+# =============================================================================
 
-  # Determine SSH public key to use
-  # Use try() to gracefully handle missing files
-  ssh_key = var.ssh_public_key != "" ? var.ssh_public_key : (
-    var.ssh_public_key_file != "" ? try(file(var.ssh_public_key_file), "") : ""
-  )
+# Download and verify Ubuntu cloud image
+resource "null_resource" "download_image" {
+  
+  provisioner "local-exec" {
+    command = "${path.module}/scripts/get-ubuntu-cloudimg.sh ${var.image_url} ${var.image_name}"
+    
+    working_dir = path.module
+  }
+}
 
-  # All SSH keys combined
-  all_ssh_keys = concat(
-    local.ssh_key != "" ? [local.ssh_key] : [],
-    var.ssh_authorized_keys
-  )
+# =============================================================================
+# Lifecycle Management
+# =============================================================================
+
+# Prevent accidental deletion of the template
+resource "terraform_data" "template_protection" {
+  depends_on = [module.template]
+  
+  lifecycle {
+    prevent_destroy = true
+  }
 }

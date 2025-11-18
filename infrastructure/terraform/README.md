@@ -1,715 +1,583 @@
-# Kubernetes Cluster Infrastructure with Terraform
+# Kubernetes on Proxmox with Terraform
 
-This repository contains Terraform configurations for deploying a production-ready Kubernetes cluster on AWS using kubeadm, containerd, and cloud-init.
+A complete Infrastructure as Code (IaC) solution for deploying Kubernetes clusters on Proxmox VE using Terraform. This project provides a production-ready, scalable, and maintainable way to manage Kubernetes infrastructure.
 
-## 🏗️ Architecture Overview
+## 🚀 Features
 
-The infrastructure provisions:
+- **Complete Automation**: End-to-end Kubernetes cluster deployment
+- **Proxmox Integration**: Native Proxmox VE API integration with SSH fallback
+- **Modular Design**: Clean separation of concerns with reusable modules
+- **Cloud-Init Ready**: Automated node provisioning and configuration
+- **Multiple Network Plugins**: Support for Flannel, Calico, and Cilium
+- **Flexible Configuration**: Comprehensive variable support with validation
+- **Production Ready**: Includes security, monitoring, and best practices
+- **Cluster Scaling**: Easy horizontal scaling of master and worker nodes
 
-- **VPC** with public and private subnets across multiple Availability Zones
-- **NAT Gateways** for outbound internet access from private subnets
-- **Security Groups** with proper Kubernetes networking rules
-- **EC2 Instances** for master and worker nodes
-- **EBS Volumes** for persistent storage
-- **Cloud-init Templates** for automated node provisioning
-- **Kubeadm Scripts** for cluster initialization and worker joining
+## 📋 Prerequisites
 
-## 🚀 Quick Start
+### System Requirements
 
-### Prerequisites
+- Proxmox VE 7.0+ with API access
+- Ubuntu 22.04 LTS cloud image support
+- Terraform 1.0+
+- SSH key access to Proxmox host
+- Sufficient resources for planned cluster size
 
-1. **Terraform >= 1.0**
-2. **AWS CLI** configured with appropriate credentials
-3. **SSH Key Pair** (or let Terraform generate one)
+### Required Software
 
-### Installation Steps
+```bash
+# Install Terraform (Ubuntu/Debian)
+wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt update && sudo apt install terraform
 
-1. **Clone and Navigate**
+# Verify installation
+terraform version
+```
+
+### Proxmox Configuration
+
+1. **Enable API Access**:
+   - Create Proxmox user with appropriate permissions
+   - Generate API token or use username/password authentication
+   - Configure network access to Proxmox API (port 8006)
+
+2. **SSH Access**:
+   - Enable SSH access to Proxmox host
+   - Configure SSH key authentication
+   - Verify user permissions for VM management
+
+## 🏗️ Project Structure
+
+```
+infrastructure/terraform/
+├── main.tf                          # Main orchestration file
+├── variables.tf                      # Variable definitions
+├── outputs.tf                       # Output definitions
+├── versions.tf                      # Terraform and provider versions
+├── providers.tf                     # Provider configurations
+├── terraform.tfvars                 # User configuration (actual values)
+├── terraform.tfvars.example         # Configuration template
+├── modules/                         # Reusable modules
+│   ├── template/                    # VM template creation
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   ├── outputs.tf
+│   │   └── templates/
+│   │       └── cloud-init.yaml.tpl
+│   └── kubernetes_node_pool/        # Kubernetes node management
+│       ├── main.tf
+│       ├── variables.tf
+│       ├── outputs.tf
+│       └── templates/
+│           ├── master.yaml.tpl
+│           └── worker.yaml.tpl
+├── cloud-init/                      # Cloud-init templates
+│   ├── master.yaml.tpl
+│   ├── worker.yaml.tpl
+│   └── common.sh
+├── scripts/                         # Utility scripts
+│   ├── get-ubuntu-cloudimg.sh        # Image download with verification
+│   ├── kubeadm-init.sh              # Master initialization
+│   ├── kubeadm-join.sh              # Worker node join
+│   └── network-plugin-install.sh     # Network plugin setup
+└── README.md                        # This documentation
+```
+
+## ⚙️ Configuration
+
+### Quick Start
+
+1. **Copy Configuration Template**:
    ```bash
-   cd infrastructure/terraform
+   cp terraform.tfvars.example terraform.tfvars
    ```
 
-2. **Initialize Terraform**
-   ```bash
-   terraform init
-   ```
+2. **Edit Configuration**:
+   Edit `terraform.tfvars` with your specific values:
 
-3. **Review Configuration**
-   ```bash
-   # Review terraform.tfvars for your environment
-   cat terraform.tfvars
-   ```
-
-4. **Plan the Deployment**
-   ```bash
-   terraform plan -var-file="terraform.tfvars"
-   ```
-
-5. **Apply the Configuration**
-   ```bash
-   terraform apply -var-file="terraform.tfvars"
-   ```
-
-6. **Get Cluster Access**
-   ```bash
-   # Get the master node IP
-   terraform output -json | jq -r '.master_public_ips.value[0]'
+   ```hcl
+   # Proxmox Configuration
+   proxmox_api_url = "https://192.168.0.200:8006/api2/json"
+   proxmox_user = "root@pam"
+   proxmox_password = "your_password_here"
+   proxmox_node = "proxmox1"
+   proxmox_host = "192.168.0.200"
    
-   # SSH to master node
-   ssh -i ~/.ssh/k8s-cluster-key ubuntu@<MASTER_IP>
+   # Node Configuration
+   master_count = 1
+   worker_count = 2
+   master_cores = 4
+   worker_cores = 8
+   master_memory = 8192
+   worker_memory = 16384
    
-   # Verify cluster status
-   kubectl get nodes
+   # Kubernetes Configuration
+   k8s_version = "1.30.0"
+   network_plugin = "flannel"
+   pod_network_cidr = "10.244.0.0/16"
    ```
 
-## 📋 Configuration Reference
+### Environment Variables
 
-### Core Variables
+For enhanced security, you can use environment variables:
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `cluster_name` | Name of the Kubernetes cluster | `k8s-cluster` |
-| `region` | AWS region for deployment | `us-west-2` |
-| `master_count` | Number of master nodes | `1` |
-| `worker_count` | Number of worker nodes | `2` |
-| `network_plugin` | CNI plugin (flannel/cilium/calico) | `flannel` |
-| `kubernetes_version` | Kubernetes version | `1.30.0` |
+```bash
+# Proxmox Authentication
+export PROXMOX_VE_PASSWORD="your_password"
+export PROXMOX_VE_API_TOKEN="user@realm!tokenid=secret"
 
-### Networking Variables
+# SSH Configuration
+export TF_VAR_proxmox_ssh_key="~/.ssh/proxmox_key"
+```
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `vpc_cidr` | VPC CIDR block | `10.0.0.0/16` |
-| `pod_network_cidr` | Pod network CIDR | `10.244.0.0/16` |
-| `public_subnet_cidrs` | Public subnet CIDRs | `["10.0.1.0/24", "10.0.2.0/24"]` |
-| `private_subnet_cidrs` | Private subnet CIDRs | `["10.0.11.0/24", "10.0.12.0/24"]` |
+## 🚀 Deployment Guide
 
-### Compute Variables
+### 1. Initialize Terraform
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `master_instance_type` | Master node instance type | `t3.medium` |
-| `worker_instance_type` | Worker node instance type | `t3.large` |
-| `root_volume_size` | Root volume size (GB) | `30` |
-| `data_volume_size` | Worker data volume size (GB) | `50` |
+```bash
+cd infrastructure/terraform
+terraform init
+```
 
-## 🔧 Network Plugin Configuration
+### 2. Plan Deployment
 
-### Flannel (Default)
-- Simple overlay network
+```bash
+terraform plan
+```
+
+### 3. Deploy Cluster
+
+```bash
+terraform apply
+```
+
+### 4. Verify Deployment
+
+```bash
+# Check outputs
+terraform output
+
+# SSH to master node
+ssh -i ~/.ssh/id_rsa ubuntu@$(terraform output -json | jq -r '.master_ips.value[0]')
+
+# Check cluster status
+kubectl get nodes
+kubectl get pods --all-namespaces
+```
+
+## 📊 Cluster Management
+
+### Scaling Operations
+
+#### Add Worker Nodes
+
+Update `terraform.tfvars`:
+```hcl
+worker_count = 5  # Increase from current count
+```
+
+Apply changes:
+```bash
+terraform apply
+```
+
+#### Add Master Nodes (HA)
+
+Update `terraform.tfvars`:
+```hcl
+master_count = 3  # For high availability
+```
+
+Apply changes:
+```bash
+terraform apply
+```
+
+### Node Management
+
+#### Drain Node for Maintenance
+```bash
+# Get node name
+kubectl get nodes
+
+# Drain node
+kubectl drain <node-name> --ignore-daemonsets --delete-emptydir-data
+
+# Maintenance operations...
+
+# Uncordon node
+kubectl uncordon <node-name>
+```
+
+#### Remove Node
+```bash
+# Drain node first
+kubectl drain <node-name> --ignore-daemonsets --delete-emptydir-data
+
+# Delete node
+kubectl delete node <node-name>
+
+# Update Terraform configuration
+# Decrease master_count or worker_count
+terraform apply
+```
+
+## 🔧 Network Configuration
+
+### Supported Network Plugins
+
+#### Flannel (Default)
+- Simple, lightweight overlay network
 - Good for development and testing
-- Uses VXLAN encapsulation
-- Pod CIDR: `10.244.0.0/16`
+- VXLAN backend with UDP port 8472
 
-### Cilium
-- High-performance CNI
-- Advanced networking and security
-- eBPF-based networking
-- Better for production workloads
-
-### Calico
-- Network policy enforcement
+#### Calico
+- Production-ready network policy
 - BGP routing support
-- Enterprise-grade features
-- IPAM capabilities
+- Advanced security features
 
-## 📊 Scaling Operations
+#### Cilium
+- eBPF-based networking
+- High performance
+- Advanced observability
 
-### Scaling Up Worker Nodes
+### Network Plugin Selection
 
-1. **Update Configuration**
-   ```bash
-   # Edit terraform.tfvars
-   worker_count = 10  # Increase from current value
-   ```
+Edit `terraform.tfvars`:
+```hcl
+network_plugin = "calico"  # Options: flannel, calico, cilium
+```
 
-2. **Apply Changes**
-   ```bash
-   terraform plan -var-file="terraform.tfvars"
-   terraform apply -var-file="terraform.tfvars"
-   ```
+## 🔒 Security Considerations
 
-3. **Verify New Nodes**
-   ```bash
-   kubectl get nodes
-   ```
+### Authentication Methods
 
-### Scaling Up Master Nodes (High Availability)
+#### API Token Authentication (Recommended)
+```hcl
+proxmox_api_token_id = "root@pam!token_id"
+proxmox_api_token_secret = "your_token_secret"
+```
 
-1. **Update Configuration**
-   ```bash
-   master_count = 3  # For HA setup
-   ```
+#### Username/Password Authentication
+```hcl
+proxmox_user = "root@pam"
+proxmox_password = "your_password"
+```
 
-2. **Apply Changes**
-   ```bash
-   terraform apply -var-file="terraform.tfvars"
-   ```
+### SSH Key Management
 
-3. **Configure Load Balancer**
-   - Set up external load balancer for API server
-   - Update kubeconfig to use load balancer endpoint
+Generate SSH keys:
+```bash
+ssh-keygen -t rsa -b 4096 -C "terraform-proxmox"
+```
 
-## 🔄 Image Update Workflow
+Configure in `terraform.tfvars`:
+```hcl
+ssh_private_key_path = "~/.ssh/terraform_proxmox"
+ssh_public_key_path = "~/.ssh/terraform_proxmox.pub"
+```
 
-### Update Kubernetes Version
+### Network Security
 
-1. **Update Version Variable**
-   ```bash
-   # In terraform.tfvars
-   kubernetes_version = "1.30.1"
-   ```
+- Use VLANs for network isolation
+- Configure firewall rules appropriately
+- Enable TLS verification for production
+- Use dedicated service accounts
 
-2. **Update Cloud-init Templates**
-   - Edit `cloud-init/master.yaml.tpl` and `cloud-init/worker.yaml.tpl`
-   - Update package versions in scripts
+## 📈 Monitoring and Logging
 
-3. **Apply Changes**
-   ```bash
-   terraform apply -var-file="terraform.tfvars"
-   ```
+### Cluster Monitoring
 
-### Update Container Images
+Access monitoring dashboards:
+```bash
+# Port forward to access dashboards
+kubectl port-forward svc/grafana 3000:3000
+kubectl port-forward svc/prometheus 9090:9090
+```
 
-1. **Check Current Images**
-   ```bash
-   kubectl get pods -A -o jsonpath='{.items[*].spec.containers[*].image}' | tr ' ' '\n' | sort -u
-   ```
+### Log Collection
 
-2. **Update Images**
-   ```bash
-   # For system images, update cloud-init templates
-   # For application images, update your deployments
-   kubectl set image deployment/app app=new-image:tag
-   ```
+View cluster logs:
+```bash
+# System logs
+journalctl -u kubelet -f
+
+# Kubernetes logs
+kubectl logs -f deployment/coredns -n kube-system
+
+# Node logs
+kubectl logs -f -l k8s-app=calico-node -n kube-system
+```
 
 ## 🛠️ Troubleshooting
 
 ### Common Issues
 
-#### 1. Nodes Not Joining Cluster
-```bash
-# Check join token validity
-kubectl get tokens
+#### 1. Proxmox API Connection Failed
 
-# Generate new join token
-kubeadm token create --print-join-command
-
-# Check network connectivity
-ping <MASTER_IP>
-telnet <MASTER_IP> 6443
+**Symptoms**: 
+```
+Error: failed to create proxmox provider: POST https://192.168.0.200:8006/api2/json/tokens...
 ```
 
-#### 2. Pod Network Issues
-```bash
-# Check CNI pods
-kubectl get pods -n kube-system -l k8s-app=<network-plugin>
+**Solutions**:
+- Verify Proxmox API URL and credentials
+- Check network connectivity to Proxmox host
+- Ensure user has sufficient permissions
+- Verify TLS certificate settings
 
-# Check network policies
-kubectl get networkpolicies --all-namespaces
+#### 2. VM Creation Failed
 
-# Test pod connectivity
-kubectl run test-pod --image=busybox --rm -it -- /bin/sh
+**Symptoms**:
+```
+Error: error creating VM: VM creation failed
 ```
 
-#### 3. Storage Issues
-```bash
-# Check PV/PV status
-kubectl get pv,pvc --all-namespaces
+**Solutions**:
+- Check available resources on Proxmox node
+- Verify storage pool availability
+- Ensure VM ID range is not in use
+- Check network bridge configuration
 
-# Check EBS volumes
-aws ec2 describe-volumes --filters Name=tag:Name,Values=<cluster-name>-*
+#### 3. Kubernetes Cluster Initialization Failed
+
+**Symptoms**:
+```
+[kubelet-check] It seems like the kubelet isn't running or healthy
 ```
 
-#### 4. SSH Access Issues
-```bash
-# Check security group rules
-aws ec2 describe-security-groups --group-ids <sg-id>
+**Solutions**:
+- Check containerd service status
+- Verify swap is disabled
+- Check kernel modules are loaded
+- Review sysctl configuration
 
-# Check key pair
-aws ec2 describe-key-pairs --key-names <key-name>
+#### 4. Network Plugin Issues
 
-# Debug SSH connection
-ssh -v -i ~/.ssh/<key> ubuntu@<node-ip>
+**Symptoms**:
+```
+Network plugin is not ready: cni config uninitialized
 ```
 
-### Log Collection
+**Solutions**:
+- Verify pod network CIDR doesn't conflict
+- Check network plugin pod status
+- Review CNI configuration
+- Ensure firewall allows required ports
 
-#### Master Node Logs
+### Debug Commands
+
+#### Proxmox Issues
 ```bash
-# Kubernetes components
-sudo journalctl -u kubelet
-sudo journalctl -u kube-apiserver
-sudo journalctl -u kube-controller-manager
-sudo journalctl -u kube-scheduler
+# Check Proxmox API
+curl -k -X POST "https://192.168.0.200:8006/api2/json/access/ticket" \
+  -d "username=root@pam&password=your_password"
 
-# Container runtime
-sudo journalctl -u containerd
+# Check VM status
+qm list
 ```
 
-#### Worker Node Logs
+#### Kubernetes Issues
 ```bash
-# Kubelet
-sudo journalctl -u kubelet
-
-# CNI logs
-sudo journalctl -u flannel  # or cilium/calico
-```
-
-### Recovery Procedures
-
-#### Recover Failed Master
-1. **Identify Failed Node**
-   ```bash
-   kubectl get nodes -o wide
-   ```
-
-2. **Remove from Cluster**
-   ```bash
-   kubectl delete node <failed-node-name>
-   ```
-
-3. **Terminate Instance**
-   ```bash
-   aws ec2 terminate-instances --instance-ids <instance-id>
-   ```
-
-4. **Recreate with Terraform**
-   ```bash
-   terraform apply -var-file="terraform.tfvars"
-   ```
-
-#### Recover Failed Worker
-1. **Drain Node**
-   ```bash
-   kubectl drain <node-name> --ignore-daemonsets --delete-local-data
-   ```
-
-2. **Remove from Cluster**
-   ```bash
-   kubectl delete node <node-name>
-   ```
-
-3. **Recreate with Terraform**
-   ```bash
-   terraform apply -var-file="terraform.tfvars"
-   ```
-
-## 📈 Monitoring and Observability
-
-### CloudWatch Integration
-- Instance metrics enabled by default
-- Custom metrics can be added via CloudWatch agent
-- Logs can be shipped to CloudWatch Logs
-
-### Kubernetes Monitoring
-```bash
-# Install metrics-server
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-
-# Check node metrics
-kubectl top nodes
-kubectl top pods --all-namespaces
-```
-
-### Health Checks
-```bash
-# Cluster health
-kubectl get componentstatuses
-kubectl get cs
-
-# Node health
+# Check cluster status
 kubectl get nodes -o wide
-
-# Pod health
 kubectl get pods --all-namespaces
+
+# Check system services
+systemctl status kubelet
+systemctl status containerd
+systemctl status docker
+
+# Check logs
+journalctl -u kubelet -f
+kubectl describe pod <pod-name> -n <namespace>
 ```
 
-## 🔒 Security Considerations
+## 🔄 Maintenance Operations
 
-### Network Security
-- Security groups restrict access to necessary ports only
-- Private subnets for worker nodes when possible
-- VPC flow logs for network monitoring
+### Image Updates
 
-### Instance Security
-- AMIs with latest security updates
-- Encrypted EBS volumes
-- SSH key-based authentication only
-
-### Kubernetes Security
-- RBAC enabled by default
-- Network policies (when using Calico/Cilium)
-- Pod Security Policies (if required)
-
-## 💰 Cost Optimization
-
-### Instance Types
-- Use appropriate instance sizes for workloads
-- Consider burstable instances (t3/t4) for dev/test
-- Use Reserved Instances for production workloads
-
-### Storage
-- Use gp3 volumes for better performance/cost ratio
-- Implement lifecycle policies for EBS snapshots
-- Monitor and clean up unused volumes
-
-### Monitoring Costs
+Update Ubuntu cloud image:
 ```bash
-# Check AWS costs
-aws ce get-cost-and-usage --time-period Start=<start-date>,End=<end-date> --granularity MONTHLY
+# Download new image
+./scripts/get-ubuntu-cloudimg.sh
 
-# Monitor resource utilization
-kubectl top nodes
-kubectl top pods --all-namespaces
+# Update template
+terraform apply -replace=module.template
 ```
 
-## 🧪 Development and Testing
+### Kubernetes Upgrades
 
-### Local Development
+Upgrade Kubernetes version:
+```hcl
+k8s_version = "1.30.1"  # Update to desired version
+```
+
+Apply upgrade:
 ```bash
-# Use local backend for state
-terraform {
-  backend "local" {
-    path = "terraform.tfstate"
-  }
+terraform apply
+```
+
+### Backup and Recovery
+
+#### Backup Cluster Configuration
+```bash
+# Backup etcd
+kubectl get nodes
+kubectl get pods --all-namespaces
+
+# Save Terraform state
+cp terraform.tfstate terraform.tfstate.backup
+```
+
+#### Restore from Backup
+```bash
+# Restore Terraform state
+cp terraform.tfstate.backup terraform.tfstate
+
+# Verify cluster state
+terraform plan
+```
+
+## 📚 Advanced Configuration
+
+### Custom Node Pools
+
+Define specific node configurations:
+```hcl
+# High-performance workers
+worker_cores = 16
+worker_memory = 32768
+worker_disk_size = "200G"
+
+# GPU-enabled nodes (if supported)
+# Additional configuration in modules
+```
+
+### Multi-Node Proxmox Clusters
+
+Configure node mapping:
+```hcl
+# Distribute VMs across Proxmox nodes
+proxmox_node_map = {
+  "master-1" = "proxmox1"
+  "worker-1" = "proxmox2"
+  "worker-2" = "proxmox3"
 }
-
-# Test with smaller instance counts
-master_count = 1
-worker_count = 1
 ```
 
-### Testing Workflow
-1. **Plan and Review**
-   ```bash
-   terraform plan -detailed-exitcode -var-file="terraform.tfvars"
-   ```
+### Storage Configuration
 
-2. **Validate Configuration**
-   ```bash
-   terraform validate
-   terraform fmt -check
-   ```
+Configure multiple storage pools:
+```hcl
+# Different storage for different purposes
+master_storage = "fast-ssd"
+worker_storage = "large-hdd"
+template_storage = "local"
+```
 
-3. **Security Scanning**
-   ```bash
-   # Install tfsec
-   curl -sfL https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | sh -s -- -b /usr/local/bin
-   
-   # Run security scan
-   tfsec .
-   ```
+## 🔗 Integration Examples
 
-## 📚 Additional Resources
+### CI/CD Pipeline Integration
 
-### Documentation
-- [Kubernetes Documentation](https://kubernetes.io/docs/)
-- [kubeadm Reference](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/)
-- [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
+```yaml
+# GitLab CI example
+deploy_k8s:
+  stage: deploy
+  script:
+    - cd infrastructure/terraform
+    - terraform init
+    - terraform apply -auto-approve
+  environment: production
+```
 
-### Community
-- [Kubernetes Slack](https://kubernetes.slack.com/)
-- [Terraform Community](https://discuss.hashicorp.com/c/terraform-core)
-- [AWS Containers](https://aws.amazon.com/containers/)
+### Ansible Integration
+
+```yaml
+# Ansible playbook example
+- name: Deploy Kubernetes cluster
+  hosts: localhost
+  tasks:
+    - name: Apply Terraform configuration
+      community.general.terraform:
+        project_path: infrastructure/terraform
+        state: present
+        variables_file: terraform.tfvars
+```
+
+## 📖 API Reference
+
+### Terraform Outputs
+
+Key outputs available after deployment:
+
+```bash
+# Cluster information
+terraform output cluster_name
+terraform output kubernetes_version
+terraform output cluster_endpoint
+
+# Node information
+terraform output master_nodes
+terraform output worker_nodes
+
+# SSH access
+terraform output ssh_access
+terraform output connect_commands
+```
+
+### Module Interfaces
+
+#### Template Module
+- **Inputs**: Proxmox config, image URL, storage settings
+- **Outputs**: Template ID, template name, storage location
+
+#### Kubernetes Node Pool Module
+- **Inputs**: Template ID, node counts, resource specifications
+- **Outputs**: VM details, IP addresses, node names
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+
+### Development Setup
+
+```bash
+# Clone repository
+git clone <repository-url>
+cd infrastructure/terraform
+
+# Install development dependencies
+terraform init
+terraform fmt -check
+terraform validate
+
+# Run tests (if available)
+terraform test
+```
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
+## 🙋‍♂️ Support
 
-For issues and questions:
+- **Issues**: [GitHub Issues](https://github.com/your-repo/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/your-repo/discussions)
+- **Documentation**: [Wiki](https://github.com/your-repo/wiki)
 
-1. Check the troubleshooting section above
-2. Search existing GitHub issues
-3. Create a new issue with detailed information
-4. Include logs and configuration details
+## 🗺️ Roadmap
+
+- [ ] Add Helm chart deployment support
+- [ ] Implement backup and restore automation
+- [ ] Add monitoring stack (Prometheus, Grafana)
+- [ ] Support for additional network plugins
+- [ ] Multi-cloud deployment support
+- [ ] GitOps integration (ArgoCD, Flux)
+- [ ] Automated security scanning
+- [ ] Cost optimization features
 
 ---
 
-**Note**: This infrastructure is designed for educational and development purposes. For production use, consider additional security hardening, monitoring, and backup strategies.
-# Terraform Infrastructure for Kubernetes on Proxmox
-
-This directory contains the Terraform configuration for deploying a Kubernetes cluster on Proxmox VE 9.
-
-## Overview
-
-This infrastructure as code (IaC) setup provisions:
-- A VM template based on Ubuntu cloud image
-- Multiple Kubernetes control plane (master) nodes
-- Multiple Kubernetes worker nodes
-- Network and storage configuration
-
-## Prerequisites
-
-1. **Terraform**: Version >= 1.5
-   ```bash
-   terraform version
-   ```
-
-2. **Proxmox VE**: Version 9 running at `192.168.0.200` (or your configured endpoint)
-
-3. **Network Requirements**:
-   - Network connectivity to Proxmox API endpoint
-   - SSH access to Proxmox host
-   - Available IP addresses for VMs
-
-4. **Credentials**:
-   - Proxmox API credentials (username/password or API token)
-   - SSH private key for Proxmox host access
-   - SSH public key for VM access
-
-## Quick Start
-
-### 1. Initialize Configuration
-
-Copy the example variables file:
-```bash
-cp terraform.tfvars.example terraform.tfvars
-```
-
-Edit `terraform.tfvars` with your specific configuration:
-```bash
-# Use your preferred editor
-vim terraform.tfvars
-# or
-nano terraform.tfvars
-```
-
-### 2. Set Environment Variables
-
-For security, it's recommended to use environment variables for sensitive data:
-
-```bash
-# For username/password authentication
-export PROXMOX_VE_USERNAME="root@pam"
-export PROXMOX_VE_PASSWORD="your-password"
-
-# OR for API token authentication (recommended)
-export PROXMOX_VE_API_TOKEN="root@pam!terraform=12345678-1234-1234-1234-123456789abc"
-
-# SSH private key (if not using file path)
-export PROXMOX_VE_SSH_PRIVATE_KEY="$(cat ~/.ssh/id_rsa)"
-```
-
-### 3. Initialize Terraform
-
-Download the required provider plugins:
-```bash
-terraform init
-```
-
-### 4. Review the Plan
-
-See what resources will be created:
-```bash
-terraform plan
-```
-
-### 5. Apply Configuration
-
-Once modules are implemented, create the infrastructure:
-```bash
-terraform apply
-```
-
-## Configuration
-
-### Required Variables
-
-The following variables must be set in `terraform.tfvars` or via environment variables:
-
-- `proxmox_endpoint`: Proxmox API endpoint (default: https://192.168.0.200:8006)
-- `proxmox_username` or `PROXMOX_VE_USERNAME`: Proxmox username
-- `proxmox_password` or `PROXMOX_VE_PASSWORD`: Proxmox password
-- OR `proxmox_api_token` or `PROXMOX_VE_API_TOKEN`: API token
-- `ssh_public_key` or `ssh_public_key_file`: SSH public key for VM access
-
-### Optional Variables
-
-See `variables.tf` for all available options, including:
-- VM sizing (CPU, memory, disk)
-- Network configuration
-- Kubernetes version and settings
-- Node placement and distribution
-
-## Authentication Methods
-
-### Option 1: Username and Password
-
-```bash
-export PROXMOX_VE_USERNAME="root@pam"
-export PROXMOX_VE_PASSWORD="your-password"
-```
-
-### Option 2: API Token (Recommended)
-
-1. Create an API token in Proxmox:
-   - Navigate to Datacenter → Permissions → API Tokens
-   - Create a new token with appropriate privileges
-   - Note the token ID and secret
-
-2. Set the environment variable:
-```bash
-export PROXMOX_VE_API_TOKEN="root@pam!terraform=12345678-1234-1234-1234-123456789abc"
-```
-
-### SSH Key Setup
-
-For Proxmox host operations:
-```bash
-# Option 1: Use existing SSH key file
-proxmox_ssh_private_key = "~/.ssh/id_rsa"
-
-# Option 2: Use environment variable
-export PROXMOX_VE_SSH_PRIVATE_KEY="$(cat ~/.ssh/id_rsa)"
-```
-
-For VM access:
-```bash
-# Option 1: Direct key in variables
-ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2E..."
-
-# Option 2: Path to key file (recommended)
-ssh_public_key_file = "~/.ssh/id_rsa.pub"
-```
-
-## Module Structure
-
-The infrastructure is organized into modules:
-
-```
-infrastructure/terraform/
-├── main.tf                 # Main configuration and module calls
-├── variables.tf            # Variable definitions
-├── outputs.tf              # Output definitions
-├── providers.tf            # Provider configuration
-├── versions.tf             # Version constraints
-├── terraform.tfvars.example # Example configuration
-├── README.md              # This file
-└── modules/               # Module implementations (to be created)
-    ├── template/          # VM template creation
-    ├── control-plane/     # Control plane node deployment
-    └── worker-pool/       # Worker node deployment
-```
-
-## Next Steps
-
-The Terraform configuration is initialized and ready. To complete the infrastructure:
-
-1. **Implement the template module** (`./modules/template`)
-   - Create VM template from cloud image
-   - Configure cloud-init settings
-
-2. **Implement the control-plane module** (`./modules/control-plane`)
-   - Deploy control plane VMs from template
-   - Initialize Kubernetes control plane
-   - Configure high availability
-
-3. **Implement the worker-pool module** (`./modules/worker-pool`)
-   - Deploy worker VMs from template
-   - Join workers to the cluster
-
-4. **Uncomment module blocks** in `main.tf`
-
-5. **Uncomment outputs** in `outputs.tf`
-
-## Troubleshooting
-
-### terraform init fails
-
-**Issue**: Provider download fails
-```
-Error: Failed to query available provider packages
-```
-
-**Solution**: Check your internet connection and firewall settings. The provider is downloaded from the Terraform Registry.
-
-### Connection to Proxmox fails
-
-**Issue**: Cannot connect to Proxmox API
-```
-Error: error creating Proxmox client: ...
-```
-
-**Solutions**:
-- Verify the `proxmox_endpoint` URL is correct
-- Check that Proxmox API is accessible from your machine
-- Verify credentials are correct
-- If using self-signed certificates, ensure `proxmox_insecure = true`
-
-### SSH connection fails
-
-**Issue**: Cannot SSH to Proxmox host
-```
-Error: SSH authentication failed
-```
-
-**Solutions**:
-- Verify SSH key path is correct
-- Ensure the public key is in Proxmox host's `~/.ssh/authorized_keys`
-- Check SSH username is correct (usually `root`)
-- Test SSH connection manually: `ssh -i ~/.ssh/id_rsa root@192.168.0.200`
-
-## Security Best Practices
-
-1. **Use API Tokens**: Prefer API tokens over username/password
-2. **Environment Variables**: Store sensitive data in environment variables, not in `.tfvars` files
-3. **TLS Certificates**: Use valid TLS certificates in production (set `proxmox_insecure = false`)
-4. **SSH Keys**: Use strong SSH keys (RSA 4096-bit or Ed25519)
-5. **Network Security**: Restrict access to Proxmox API and VMs using firewalls
-6. **State Files**: Store Terraform state in a secure remote backend (S3, Terraform Cloud, etc.)
-
-## Useful Commands
-
-```bash
-# Initialize and download providers
-terraform init
-
-# Validate configuration
-terraform validate
-
-# Format configuration files
-terraform fmt -recursive
-
-# Plan changes
-terraform plan
-
-# Apply changes
-terraform apply
-
-# Show current state
-terraform show
-
-# List resources
-terraform state list
-
-# Destroy infrastructure
-terraform destroy
-
-# Show outputs
-terraform output
-```
-
-## Documentation
-
-- [Terraform Documentation](https://www.terraform.io/docs)
-- [Proxmox Provider Documentation](https://registry.terraform.io/providers/bpg/proxmox/latest/docs)
-- [Proxmox VE API Documentation](https://pve.proxmox.com/wiki/Proxmox_VE_API)
-
-## Support
-
-For issues or questions:
-1. Check the troubleshooting section above
-2. Review Terraform and provider documentation
-3. Consult Proxmox VE documentation
-4. Open an issue in the project repository
+**Happy Kubernetes clustering! 🎉**
