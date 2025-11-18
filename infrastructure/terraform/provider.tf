@@ -19,13 +19,13 @@ terraform {
       version = "~> 4.0"
     }
   }
-}
-  required_version = ">= 1.5"
-
-  required_providers {
-    proxmox = {
-      source  = "bpg/proxmox"
-      version = "0.86.0"
-    }
-  }
+  
+  # Backend configuration (uncomment and configure as needed)
+  # backend "s3" {
+  #   bucket         = "k8s-cluster-terraform-state"
+  #   key            = "terraform.tfstate"
+  #   region         = "us-west-2"
+  #   encrypt        = true
+  #   dynamodb_table = "terraform-locks"
+  # }
 }
