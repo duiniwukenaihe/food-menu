@@ -93,3 +93,15 @@ coverage/
 # Vite
 /frontend/dist-ssr/
 /frontend/*.local
+
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/terraform.tfvars
+**/.terraformrc
+**/crash.log
+**/crash.*.log
+**/*.tfplan
+**/*.tfplan.*

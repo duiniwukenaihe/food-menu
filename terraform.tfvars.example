@@ -98,3 +98,4 @@ ssh_public_keys = [
 
 # Optional: SSH password for ubuntu user (use SSH keys instead if possible)
 # ssh_password = "your-secure-password"
+}

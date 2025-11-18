@@ -53,6 +53,7 @@ This repository contains Terraform modules for automating Kubernetes cluster inf
 │   │   ├── cloud-init-network-data.tpl
 │   │   └── README.md
 │   └── kubernetes_node_pool/  # Kubernetes node pool module
+│   └── template/              # Ubuntu template module
 │       ├── main.tf
 │       ├── variables.tf
 │       ├── outputs.tf
@@ -303,6 +304,7 @@ Validates module configuration and file structure:
 ## 📊 Outputs
 
 ### Template Outputs
+The module provides the following outputs:
 
 - `template_name`: Name of the created template
 - `template_vmid`: VM ID of the template
