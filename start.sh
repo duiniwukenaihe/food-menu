@@ -55,8 +55,17 @@ setup_database() {
         echo "2. 数据库 'food_ordering' 已创建"
         echo "3. 用户 'postgres' 存在且密码为 'password'"
         echo ""
-        echo "或者运行以下命令创建数据库："
-        echo "sudo -u postgres createdb food_ordering"
+        echo "快速修复命令："
+        echo "  # 检查PostgreSQL状态"
+        echo "  sudo systemctl status postgresql"
+        echo ""
+        echo "  # 启动PostgreSQL"
+        echo "  sudo systemctl start postgresql"
+        echo ""
+        echo "  # 创建数据库"
+        echo "  createdb food_ordering"
+        echo "  # 或"
+        echo "  sudo -u postgres createdb food_ordering"
         echo ""
         read -p "是否继续启动应用？(y/N): " -n 1 -r
         echo
@@ -67,9 +76,14 @@ setup_database() {
     
     # 初始化数据库表
     if [ -f "database/schema.sql" ]; then
-        echo "📝 初始化数据库表..."
-        PGPASSWORD=password psql -h localhost -U postgres -d food_ordering -f database/schema.sql
-        echo "✅ 数据库表初始化完成"
+        echo "📝 运行数据库迁移..."
+        # 使用2>&1重定向错误输出，因为IF NOT EXISTS会产生通知
+        PGPASSWORD=password psql -h localhost -U postgres -d food_ordering -f database/schema.sql 2>&1 | grep -v "NOTICE"
+        if [ $? -eq 0 ] || [ $? -eq 1 ]; then
+            echo "✅ 数据库迁移完成"
+        else
+            echo "⚠️  数据库迁移可能有警告（这通常是正常的）"
+        fi
     else
         echo "⚠️  数据库脚本文件不存在: database/schema.sql"
     fi
@@ -130,6 +144,40 @@ start_frontend() {
     cd ..
 }
 
+# 检查S3配置
+check_s3_config() {
+    echo ""
+    echo "☁️  检查S3存储配置..."
+    
+    if [ -f "backend/.env" ]; then
+        S3_CONFIGURED=false
+        if grep -q "^S3_ENDPOINT=.\+" backend/.env && \
+           grep -q "^S3_BUCKET=.\+" backend/.env; then
+            S3_CONFIGURED=true
+            echo "✅ S3配置已设置"
+        else
+            echo "⚠️  S3配置未完成"
+            echo ""
+            echo "媒体文件上传功能需要配置S3存储。"
+            echo "请编辑 backend/.env 文件，配置以下变量："
+            echo "  S3_ENDPOINT=https://your-s3-endpoint"
+            echo "  S3_ACCESS_KEY=your-access-key"
+            echo "  S3_SECRET_KEY=your-secret-key"
+            echo "  S3_BUCKET=your-bucket-name"
+            echo "  S3_REGION=your-region"
+            echo "  S3_PATH_STYLE=false  # MinIO设为true"
+            echo ""
+            echo "支持的存储服务："
+            echo "  - AWS S3"
+            echo "  - 阿里云 OSS"
+            echo "  - 腾讯云 COS"
+            echo "  - MinIO (本地开发)"
+            echo ""
+            echo "详细配置说明请查看 README.md"
+        fi
+    fi
+}
+
 # 显示服务信息
 show_info() {
     echo ""
@@ -137,11 +185,27 @@ show_info() {
     echo "=================================="
     echo "📍 前端地址: http://localhost:3000"
     echo "📍 后端地址: http://localhost:8080"
-    echo "📍 API文档: http://localhost:8080/api/v1"
+    echo "📍 API文档: docs/API.md"
+    echo "📍 API测试工具: http://localhost:8080/api-tester.html"
     echo ""
     echo "👤 测试账号:"
     echo "   管理员: admin / admin123"
     echo "   普通用户: user / user123"
+    echo ""
+    echo "📖 功能说明:"
+    echo "   - 菜品管理（需登录）"
+    echo "   - 媒体上传（需配置S3）"
+    echo "   - 随机搭配推荐"
+    echo "   - 订单管理"
+    echo ""
+    echo "🔧 配置文件:"
+    echo "   - 后端配置: backend/.env"
+    echo "   - 数据库迁移: database/schema.sql"
+    echo ""
+    echo "📚 文档:"
+    echo "   - README.md - 快速开始和配置说明"
+    echo "   - docs/API.md - API接口文档"
+    echo "   - docs/DEPLOYMENT.md - 部署指南"
     echo ""
     echo "🛑 按 Ctrl+C 停止所有服务"
     echo "=================================="
@@ -214,6 +278,9 @@ main() {
     if [ "$SKIP_DB" = false ]; then
         setup_database
     fi
+    
+    # 检查S3配置（不阻塞启动）
+    check_s3_config
     
     if [ "$SKIP_BACKEND" = false ]; then
         start_backend
