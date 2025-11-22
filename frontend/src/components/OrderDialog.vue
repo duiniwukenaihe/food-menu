@@ -13,9 +13,9 @@
           :key="item.dish.id"
           class="order-item"
         >
-          <img 
-            :src="item.dish.image_url || '/placeholder-food.jpg'" 
-            :alt="item.dish.name" 
+          <img
+            :src="item.dish.image_url || '/placeholder-food.svg'"
+            :alt="item.dish.name"
             class="item-image"
           />
           <div class="item-info">

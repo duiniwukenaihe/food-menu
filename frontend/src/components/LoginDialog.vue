@@ -8,8 +8,8 @@
     <div class="login-container">
       <!-- 北极熊图片 -->
       <div class="polar-bear-image">
-        <img src="/polar-bear.jpg" alt="北极熊" class="bear-img" />
-        <p class="bear-text">🐻‍❄️ 欢迎来到美食世界</p>
+        <div class="bear-img">🐻‍❄️</div>
+        <p class="bear-text">欢迎来到美食世界</p>
       </div>
 
       <!-- 登录表单 -->
@@ -152,7 +152,6 @@ watch(dialogVisible, (newValue) => {
   width: 120px;
   height: 120px;
   border-radius: 50%;
-  object-fit: cover;
   border: 3px solid #e0f2fe;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;

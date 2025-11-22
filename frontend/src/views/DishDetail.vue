@@ -14,7 +14,7 @@
         <div class="dish-header">
           <div class="dish-image-section">
             <img 
-              :src="dish.image_url || '/placeholder-food.jpg'" 
+              :src="dish.image_url || '/placeholder-food.svg'" 
               :alt="dish.name" 
               class="main-dish-image"
             />

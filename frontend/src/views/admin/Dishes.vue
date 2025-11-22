@@ -62,7 +62,7 @@
         <el-table-column label="图片" width="100">
           <template #default="{ row }">
             <el-image
-              :src="row.image_url || '/placeholder-food.jpg'"
+              :src="row.image_url || '/placeholder-food.svg'"
               :alt="row.name"
               style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px;"
               fit="cover"

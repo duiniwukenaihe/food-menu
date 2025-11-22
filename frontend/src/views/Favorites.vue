@@ -27,7 +27,7 @@
             class="favorite-card"
           >
             <img 
-              :src="dish.image_url || '/placeholder-food.jpg'" 
+              :src="dish.image_url || '/placeholder-food.svg'" 
               :alt="dish.name" 
               class="dish-image"
               @click="goToDishDetail(dish.id)"
